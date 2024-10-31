@@ -1,7 +1,8 @@
 import torch
 
+from src.datasets.base_dataset import DatasetItem
 
-def collate_fn(dataset_items: list[dict]):
+def collate_fn(dataset_items: list[DatasetItem]) -> DatasetItem:
     """
     Collate and pad fields in the dataset items.
     Converts individual items into a batch.

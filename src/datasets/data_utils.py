@@ -1,12 +1,17 @@
+from typing import Iterator, Any
 from itertools import repeat
 
+import torch
+from torch.utils.data import DataLoader
+from omegaconf import DictConfig
 from hydra.utils import instantiate
 
+from src.datasets.base_dataset import DatasetItem
 from src.datasets.collate import collate_fn
 from src.utils.init_utils import set_worker_seed
 
 
-def inf_loop(dataloader):
+def inf_loop(dataloader: DataLoader[DatasetItem]) -> Iterator[DatasetItem]:
     """
     Wrapper function for endless dataloader.
     Used for iteration-based training scheme.
@@ -18,7 +23,10 @@ def inf_loop(dataloader):
         yield from loader
 
 
-def move_batch_transforms_to_device(batch_transforms, device):
+def move_batch_transforms_to_device(
+    batch_transforms: dict[str, dict[str, Any]],
+    device: torch.device
+):
     """
     Move batch_transforms to device.
 
@@ -37,13 +45,16 @@ def move_batch_transforms_to_device(batch_transforms, device):
         device (str): device to use for batch transforms.
     """
     for transform_type in batch_transforms.keys():
-        transforms = batch_transforms.get(transform_type)
+        transforms = batch_transforms.get(transform_type, None)
         if transforms is not None:
             for transform_name in transforms.keys():
                 transforms[transform_name] = transforms[transform_name].to(device)
 
 
-def get_dataloaders(config, device):
+def get_dataloaders(
+    config: DictConfig,
+    device: torch.device
+) -> tuple[DataLoader[DatasetItem], dict[str, dict[str, Any]]]:
     """
     Create dataloaders for each of the dataset partitions.
     Also creates instance and batch transforms.

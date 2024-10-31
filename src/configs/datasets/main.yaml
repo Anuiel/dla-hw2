@@ -1,0 +1,12 @@
+train:
+  _target_: src.datasets.AVSSDataset
+  name: "train"
+  instance_transforms: ${transforms.instance_transforms.inference}
+val:
+  _target_: src.datasets.AVSSDataset
+  name: "val"
+  instance_transforms: ${transforms.instance_transforms.inference}
+test:
+  _target_: src.datasets.AVSSDataset
+  name: "test"
+  instance_transforms: ${transforms.instance_transforms.inference}

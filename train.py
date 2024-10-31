@@ -3,7 +3,7 @@ import warnings
 import hydra
 import torch
 from hydra.utils import instantiate
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 
 from src.datasets.data_utils import get_dataloaders
 from src.trainer import Trainer
@@ -13,7 +13,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 
 @hydra.main(version_base=None, config_path="src/configs", config_name="baseline")
-def main(config):
+def main(config: DictConfig):
     """
     Main script for training. Instantiates the model, optimizer, scheduler,
     metrics, logger, writer, and dataloaders. Runs Trainer to train and

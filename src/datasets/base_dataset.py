@@ -1,12 +1,17 @@
 import logging
 import random
-from typing import List
+from pathlib import Path
+from typing import List, Callable, Any, NewType
 
+import numpy as np
 import torch
+import torchaudio
 from torch.utils.data import Dataset
 
 logger = logging.getLogger(__name__)
 
+
+DatasetItem = NewType('DatasetItem', dict[str, Any])
 
 class BaseDataset(Dataset):
     """
@@ -16,17 +21,24 @@ class BaseDataset(Dataset):
     for the same task in the identical manner. Therefore, to work with
     several datasets, the user only have to define index in a nested class.
     """
-
     def __init__(
-        self, index, limit=None, shuffle_index=False, instance_transforms=None
+        self,
+        index: list[DatasetItem],
+        target_sr: int = 16000,
+        max_audio_length: int | None = None,
+        limit: int | None = None,
+        shuffle_index: bool = False,
+        instance_transforms: dict[str, Callable[[Any], Any]] | None = None
     ):
         """
         Args:
             index (list[dict]): list, containing dict for each element of
                 the dataset. The dict has required metadata information,
                 such as label and object path.
+            target_sr (int): supported sample rate.
             limit (int | None): if not None, limit the total number of elements
                 in the dataset to 'limit' elements.
+            max_audio_length (int): maximum allowed audio length.
             shuffle_index (bool): if True, shuffle the index. Uses python
                 random package with seed 42.
             instance_transforms (dict[Callable] | None): transforms that
@@ -35,12 +47,19 @@ class BaseDataset(Dataset):
         """
         self._assert_index_is_valid(index)
 
+        index = self._filter_records_from_dataset(
+            index, max_audio_length,
+        )
         index = self._shuffle_and_limit_index(index, limit, shuffle_index)
-        self._index: List[dict] = index
+        if not shuffle_index:
+            index = self._sort_index(index)
 
+        self._index: list[dict] = index
+
+        self.target_sr = target_sr
         self.instance_transforms = instance_transforms
 
-    def __getitem__(self, ind):
+    def __getitem__(self, ind: int) -> DatasetItem:
         """
         Get element from the index, preprocess it, and combine it
         into a dict.
@@ -56,22 +75,64 @@ class BaseDataset(Dataset):
                 (a single dataset element).
         """
         data_dict = self._index[ind]
-        data_path = data_dict["path"]
-        data_object = self.load_object(data_path)
-        data_label = data_dict["label"]
+        mix_audio, sp1_audio, sp2_audio = (
+            self.load_audio(path)
+            for path in (
+                data_dict["mix_path"],
+                data_dict["speaker_1_path"],
+                data_dict["speaker_2_path"]
+            )
+        )
 
-        instance_data = {"data_object": data_object, "labels": data_label}
+        mix_spectrogram, sp1_spectrogram, sp2_spectrogram = (
+            self.get_spectrogram(audio)
+            for audio in (
+                mix_audio,
+                sp1_audio,
+                sp2_audio
+            )
+        )
+
+        instance_data = {
+            "mix_audio": mix_audio,
+            "mix_spectrogram": mix_spectrogram,
+            "sp1_audio": sp1_audio,
+            "sp1_spectrogram": sp1_spectrogram,
+            "sp2_audio": sp2_audio,
+            "sp2_spectrogram": sp2_spectrogram
+        }
+
         instance_data = self.preprocess_data(instance_data)
 
         return instance_data
 
-    def __len__(self):
+    def load_audio(self, path: Path) -> torch.Tensor:
+        audio_tensor, sr = torchaudio.load(path)
+        audio_tensor = audio_tensor[0:1, :]  # remove all channels but the first
+        target_sr = self.target_sr
+        if sr != target_sr:
+            audio_tensor = torchaudio.functional.resample(audio_tensor, sr, target_sr)
+        return audio_tensor
+
+    def get_spectrogram(self, audio: torch.Tensor) -> torch.Tensor:
+        """
+        Special instance transform with a special key to
+        get spectrogram from audio.
+
+        Args:
+            audio (Tensor): original audio.
+        Returns:
+            spectrogram (Tensor): spectrogram for the audio.
+        """
+        return self.instance_transforms["get_spectrogram"](audio)
+
+    def __len__(self) -> int:
         """
         Get length of the dataset (length of the index).
         """
         return len(self._index)
 
-    def load_object(self, path):
+    def load_object(self, path: str) -> torch.Tensor:
         """
         Load object from disk.
 
@@ -83,7 +144,7 @@ class BaseDataset(Dataset):
         data_object = torch.load(path)
         return data_object
 
-    def preprocess_data(self, instance_data):
+    def preprocess_data(self, instance_data: DatasetItem) -> DatasetItem:
         """
         Preprocess data with instance transforms.
 
@@ -106,8 +167,9 @@ class BaseDataset(Dataset):
 
     @staticmethod
     def _filter_records_from_dataset(
-        index: list,
-    ) -> list:
+        index: list[DatasetItem],
+        max_audio_length: int | None
+    ) -> list[DatasetItem]:
         """
         Filter some of the elements from the dataset depending on
         some condition.
@@ -124,11 +186,30 @@ class BaseDataset(Dataset):
                 the dataset that satisfied the condition. The dict has
                 required metadata information, such as label and object path.
         """
-        # Filter logic
-        pass
+        initial_size = len(index)
+        if max_audio_length is not None:
+            exceeds_audio_length = (
+                np.array([el["audio_lenght"] for el in index]) >= max_audio_length
+            )
+            _total = exceeds_audio_length.sum()
+            logger.info(
+                f"{_total} ({_total / initial_size:.1%}) records are longer then "
+                f"{max_audio_length} seconds. Excluding them."
+            )
+        else:
+            exceeds_audio_length = None
+
+        if exceeds_audio_length is not None and exceeds_audio_length.any():
+            _total = exceeds_audio_length.sum()
+            index = [el for el, exclude in zip(index, exceeds_audio_length) if not exclude]
+            logger.info(
+                f"Filtered {_total} ({_total / initial_size:.1%}) records  from dataset"
+            )
+
+        return index
 
     @staticmethod
-    def _assert_index_is_valid(index):
+    def _assert_index_is_valid(index: list[DatasetItem]) -> list[DatasetItem]:
         """
         Check the structure of the index and ensure it satisfies the desired
         conditions.
@@ -139,16 +220,21 @@ class BaseDataset(Dataset):
                 such as label and object path.
         """
         for entry in index:
-            assert "path" in entry, (
-                "Each dataset item should include field 'path'" " - path to audio file."
+            assert "mix_path" in entry, (
+                "Each dataset item should include field 'mix_path'"
+                " - path to mix of audio."
             )
-            assert "label" in entry, (
-                "Each dataset item should include field 'label'"
-                " - object ground-truth label."
+            assert "speaker_1_path" in entry, (
+                "Each dataset item should include field 'speaker_1_path'"
+                " - path to first speaker speech of audio."
+            )
+            assert "speaker_2_path" in entry, (
+                "Each dataset item should include field 'speaker_2_path'"
+                " - path to first speaker speech of audio."
             )
 
     @staticmethod
-    def _sort_index(index):
+    def _sort_index(index: list[DatasetItem]) -> list[DatasetItem]:
         """
         Sort index via some rules.
 
@@ -164,10 +250,14 @@ class BaseDataset(Dataset):
                 of the dataset. The dict has required metadata information,
                 such as label and object path.
         """
-        return sorted(index, key=lambda x: x["KEY_FOR_SORTING"])
+        return sorted(index, key=lambda x: x["audio_lenght"])
 
     @staticmethod
-    def _shuffle_and_limit_index(index, limit, shuffle_index):
+    def _shuffle_and_limit_index(
+        index: list[DatasetItem],
+        limit: int | None,
+        shuffle_index: bool
+    ) -> list[DatasetItem]:
         """
         Shuffle elements in index and limit the total number of elements.
 
