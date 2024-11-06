@@ -54,7 +54,7 @@ class BaseDataset(Dataset):
         if not shuffle_index:
             index = self._sort_index(index)
 
-        self._index: list[dict] = index
+        self._index = index
 
         self.target_sr = target_sr
         self.instance_transforms = instance_transforms
@@ -76,7 +76,7 @@ class BaseDataset(Dataset):
         """
         data_dict = self._index[ind]
         mix_audio, sp1_audio, sp2_audio = (
-            self.load_audio(path)
+            self.load_audio(Path(path))
             for path in (
                 data_dict["mix_path"],
                 data_dict["speaker_1_path"],
@@ -160,6 +160,8 @@ class BaseDataset(Dataset):
         """
         if self.instance_transforms is not None:
             for transform_name in self.instance_transforms.keys():
+                if transform_name == "get_spectrogram":
+                    continue  # skip special key
                 instance_data[transform_name] = self.instance_transforms[
                     transform_name
                 ](instance_data[transform_name])

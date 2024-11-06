@@ -5,15 +5,15 @@ train:
   mix_audio:
     _target_: torchvision.transforms.v2.Compose
     transforms:
-      - _target_: src.transforms.wav_augs.Gain
+      - _target_: src.transforms.audio.wav_augs.Gain
   sp1_audio:
     _target_: torchvision.transforms.v2.Compose
     transforms:
-      - _target_: src.transforms.wav_augs.Gain
+      - _target_: src.transforms.audio.wav_augs.Gain
   sp2_audio:
     _target_: torchvision.transforms.v2.Compose
     transforms:
-      - _target_: src.transforms.wav_augs.Gain
+      - _target_: src.transforms.audio.wav_augs.Gain
 inference:
   get_spectrogram:
     _target_: torchaudio.transforms.MelSpectrogram

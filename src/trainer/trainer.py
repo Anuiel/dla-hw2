@@ -26,6 +26,12 @@ class Trainer(BaseTrainer):
                 the dataloader (possibly transformed via batch transform),
                 model outputs, and losses.
         """
+        print("ABOBA")
+        print("ABOBA")
+        print("ABOBA")
+        print("ABOBA")
+        print("ABOBA")
+        print(batch)
         batch = self.move_batch_to_device(batch)
         batch = self.transform_batch(batch)  # transform batch on device -- faster
 

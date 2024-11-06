@@ -112,3 +112,6 @@ outputs/
 .vscode/
 .idea/
 __MACOSX/
+
+# I have dataset on another disk, so symlink to it
+data

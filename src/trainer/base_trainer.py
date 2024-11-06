@@ -202,6 +202,9 @@ class BaseTrainer:
         self.train_metrics.reset()
         self.writer.set_step((epoch - 1) * self.epoch_len)
         self.writer.add_scalar("epoch", epoch)
+        for x in self.train_dataloader:
+            print(x)
+            break
         for batch_idx, batch in enumerate(
             tqdm(self.train_dataloader, desc="train", total=self.epoch_len)
         ):
