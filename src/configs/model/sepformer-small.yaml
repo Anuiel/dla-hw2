@@ -1,0 +1,10 @@
+_target_: src.model.SepFormer
+n_speakers: 2
+n_freq: 64
+kernel_size: 16
+block_size: 250
+n_sepformer_blocks: 2
+n_intra_blocks: 3
+n_inter_blocks: 3
+n_attention_heads: 8
+dropout: 0.0

@@ -1,7 +1,7 @@
 import logging
 import random
 from pathlib import Path
-from typing import List, Callable, Any, NewType
+from typing import Any, Callable, List, NewType
 
 import numpy as np
 import torch
@@ -11,7 +11,8 @@ from torch.utils.data import Dataset
 logger = logging.getLogger(__name__)
 
 
-DatasetItem = NewType('DatasetItem', dict[str, Any])
+DatasetItem = NewType("DatasetItem", dict[str, Any])
+
 
 class BaseDataset(Dataset):
     """
@@ -21,6 +22,7 @@ class BaseDataset(Dataset):
     for the same task in the identical manner. Therefore, to work with
     several datasets, the user only have to define index in a nested class.
     """
+
     def __init__(
         self,
         index: list[DatasetItem],
@@ -28,7 +30,7 @@ class BaseDataset(Dataset):
         max_audio_length: int | None = None,
         limit: int | None = None,
         shuffle_index: bool = False,
-        instance_transforms: dict[str, Callable[[Any], Any]] | None = None
+        instance_transforms: dict[str, Callable[[Any], Any]] | None = None,
     ):
         """
         Args:
@@ -48,7 +50,8 @@ class BaseDataset(Dataset):
         self._assert_index_is_valid(index)
 
         index = self._filter_records_from_dataset(
-            index, max_audio_length,
+            index,
+            max_audio_length,
         )
         index = self._shuffle_and_limit_index(index, limit, shuffle_index)
         if not shuffle_index:
@@ -80,26 +83,26 @@ class BaseDataset(Dataset):
             for path in (
                 data_dict["mix_path"],
                 data_dict["speaker_1_path"],
-                data_dict["speaker_2_path"]
+                data_dict["speaker_2_path"],
             )
         )
 
-        mix_spectrogram, sp1_spectrogram, sp2_spectrogram = (
-            self.get_spectrogram(audio)
-            for audio in (
-                mix_audio,
-                sp1_audio,
-                sp2_audio
-            )
-        )
+        # mix_spectrogram, sp1_spectrogram, sp2_spectrogram = (
+        #     self.get_spectrogram(audio)
+        #     for audio in (
+        #         mix_audio,
+        #         sp1_audio,
+        #         sp2_audio
+        #     )
+        # )
 
         instance_data = {
             "mix_audio": mix_audio,
-            "mix_spectrogram": mix_spectrogram,
+            # "mix_spectrogram": mix_spectrogram,
             "sp1_audio": sp1_audio,
-            "sp1_spectrogram": sp1_spectrogram,
+            # "sp1_spectrogram": sp1_spectrogram,
             "sp2_audio": sp2_audio,
-            "sp2_spectrogram": sp2_spectrogram
+            # "sp2_spectrogram": sp2_spectrogram
         }
 
         instance_data = self.preprocess_data(instance_data)
@@ -169,8 +172,7 @@ class BaseDataset(Dataset):
 
     @staticmethod
     def _filter_records_from_dataset(
-        index: list[DatasetItem],
-        max_audio_length: int | None
+        index: list[DatasetItem], max_audio_length: int | None
     ) -> list[DatasetItem]:
         """
         Filter some of the elements from the dataset depending on
@@ -203,7 +205,9 @@ class BaseDataset(Dataset):
 
         if exceeds_audio_length is not None and exceeds_audio_length.any():
             _total = exceeds_audio_length.sum()
-            index = [el for el, exclude in zip(index, exceeds_audio_length) if not exclude]
+            index = [
+                el for el, exclude in zip(index, exceeds_audio_length) if not exclude
+            ]
             logger.info(
                 f"Filtered {_total} ({_total / initial_size:.1%}) records  from dataset"
             )
@@ -256,9 +260,7 @@ class BaseDataset(Dataset):
 
     @staticmethod
     def _shuffle_and_limit_index(
-        index: list[DatasetItem],
-        limit: int | None,
-        shuffle_index: bool
+        index: list[DatasetItem], limit: int | None, shuffle_index: bool
     ) -> list[DatasetItem]:
         """
         Shuffle elements in index and limit the total number of elements.

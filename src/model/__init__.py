@@ -1,5 +1,5 @@
-from src.model.baseline_model import BaselineModel
+from src.model.sepformer import SepFormer
 
 __all__ = [
-    "BaselineModel",
+    "SepFormer",
 ]

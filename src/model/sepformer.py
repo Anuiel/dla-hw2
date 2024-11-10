@@ -1,210 +1,477 @@
+from enum import Enum
+
 import torch
+import torch.nn.functional as F
 from torch import nn
-from torch.nn import Sequential
 
 
-class Encoder(nn.Module): 
+class Encoder(nn.Module):
     """
     Encoder layer that transforms initial audio
-    into matrix of format similar to STFT. 
+    into matrix of format similar to STFT.
+
+    Args:
+        n_freq: number of frequencies simulated
+        kernel_size: parameter for inner 1d conv
+        stride: parameter for inner 1d conv
     """
 
-    def __init__(self, n_freq, kernel_size, stride):
-        """
-        Args: 
-            n_freq: number of frequencies simulated
-            kernel_size: parameter for inner 1d conv
-            stride: parameter for inner 1d conv
-        """
-
+    def __init__(self, n_freq: int, kernel_size: int, stride: int):
         super().__init__()
-
-        self.Conv1d = nn.Conv1d(in_channels=1,
-                                out_channels=n_freq,
-                                kernel_size=kernel_size,
-                                stride=stride,
-                                bias=False)
-
+        self.Conv1d = nn.Conv1d(
+            in_channels=1,
+            out_channels=n_freq,
+            kernel_size=kernel_size,
+            stride=stride,
+            bias=False,
+        )
         self.ReLU = nn.ReLU()
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Args: 
+        Args:
             x: Tensor, [batch_size, T]
-        Returns: 
-            Tensor, [batch_size, n_freq, T']
+        Returns:
+            out: Tensor, [batch_size, n_freq, T']
         """
-        
+
         x = self.Conv1d(x)
         return self.ReLU(x)
 
 
-class Decoder(nn.Module): 
+class Decoder(nn.Module):
     """
-    Decoder layer that transforms matrix of format
-    similar to STFT to to original audio format.
+    Encoder layer that transforms initial audio
+    into matrix of format similar to STFT.
+
+    Args:
+        n_freq: number of frequencies simulated
+        kernel_size: parameter for inner 1d conv
+        stride: parameter for inner 1d conv
     """
 
-    def __init__(self, n_freq, kernel_size, stride):
-        """
-        Args: 
-            n_freq: number of frequencies simulated
-            kernel_size: parameter for inner 1d conv
-            stride: parameter for inner 1d conv
-
-        Returns: 
-            Tensor: [n_freq, T']
-        """
-
+    def __init__(self, n_freq: int, kernel_size: int, stride: int):
         super().__init__()
+        self.Conv1dTranspose = nn.ConvTranspose1d(
+            in_channels=n_freq,
+            out_channels=1,
+            kernel_size=kernel_size,
+            stride=stride,
+            bias=False,
+        )
 
-        # Use transpose version so output dimension match original audio len
-        self.ConvTranspose1d = nn.ConvTranspose1d(in_channels=n_freq,
-                                out_channels=1,
-                                kernel_size=kernel_size,
-                                stride=stride,
-                                bias=False) 
-
-        self.ReLU = nn.ReLU()
-
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        Args: 
+        Args:
             x: Tensor, [batch_size, n_freq, T']
-
-        Returns: 
-            Tensor, [batch_size, T]
+        Returns:
+            out: Tensor, [batch_size, T]
         """
-        x = self.ConvTranspose1d(x)
-        return self.ReLU(x)
+        return self.Conv1dTranspose(x)
+
+
+class FeedForward(nn.Module):
+    """
+    FeedForward block in transformer layers
+
+    Args:
+        input_dim: size of input embeddings
+        hidden_dim: size of embeddings in hidden layer
+        dropout: dropout prbability
+    """
+
+    def __init__(self, input_dim: int, hidden_dim: int, dropout: float) -> None:
+        self.ffw = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Dropout(p=dropout),
+            nn.Linear(hidden_dim, input_dim),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x: Tensor, [..., input_dim]
+        Returns:
+            out: Tensor, [..., input_dim]
+        """
+        return self.ffw(x)
 
 
 class TransformerBlock(nn.Module):
     """
-    Both Intra and Inter transformer block. 
-    Same ideas as in original Transformer paper. 
+    Both Intra and Inter transformer block.
+    Same ideas as in original Transformer paper.
+
+    Args:
+        embed_dim: size of hidden state
+        n_attention_heads: number of attetion heads in MHSA
+        dropout: dropout probability
     """
 
-    def __init__(self, embed_dim, n_attention_heads, dropout_p):
-        self.layer_norm_input = nn.LayerNorm(normalized_shape=embed_dim)
-        self.multihead_attention = nn.modules.activation.MultiheadAttention(embed_dim, n_attention_heads, dropout=dropout_p)
-        self.layer_norm_attention = nn.LayerNorm(normalized_shape=embed_dim)
-        self.feed_forward = nn.Sequential(nn.Linear(embed_dim, embed_dim * 4),
-                                         nn.ReLU(),
-                                         nn.Dropout(p=dropout_p),
-                                         nn.Linear(embed_dim * 4, embed_dim))
-        self.dropout_final = nn.Dropout(p=dropout_p)
+    def __init__(self, embed_dim: int, n_attention_heads: int, dropout: float) -> None:
+        self.pre_mhsa_ln = nn.LayerNorm(embed_dim)
+        self.mhsa = nn.MultiheadAttention(
+            embed_dim, n_attention_heads, dropout=dropout, batch_first=True
+        )
+        self.pos_mhsa_ln = nn.LayerNorm(embed_dim)
+        self.ffw = FeedForward(embed_dim, embed_dim * 4, dropout=dropout)
 
-    def forward(self, x):
-        x_layer = self.layer_norm_input(x) 
-        x_attention = self.layer_norm_attention(self.multihead_attention(x_layer) + x)
-        x_feedforward = self.dropout_final(self.feed_forward(x_attention)) + x
-        return x_feedforward
-    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Forward pass assumes that positional encoding are beeing added into input
+
+        Args:
+            x: Tensor, [batch_size, time_dim, embed_dim]
+        Returns:
+            out: Tensor, [batch_size, time_dim, embed_dim]
+        """
+        y = self.pre_mhsa_ln(x)
+        x = x + self.mhsa(y, y, y, attn_mask=None, key_padding_mask=None)
+        x = x + self.ffw(self.pos_mhsa_ln(x))
+        return x
+
 
 class SinusoidalPositionalEncoding(nn.Module):
     """
-    Applies sinusoidal positional encoding to a tensor. 
+    Applies sinusoidal positional encoding to a tensor.
     At i, 2k: add sin(i / (10000^(2k / d_model)))
-    At i, 2k + 1: add cos(i / (10000^(2k / d_model))) 
+    At i, 2k + 1: add cos(i / (10000^(2k / d_model)))
+
+    Args:
+        hidden_dim: second dimension of tensor
+        input_len: third dimension of tensor
     """
 
-    def __init__(self, hidden_dim, input_len):
-        """
-        Args:
-            hidden_dim: second dimension of tensor
-            input_len: third dimension of tensor
-        """
+    def __init__(self, hidden_dim: int, input_len: int):
         super().__init__()
 
         positional_encoding = torch.zeros(input_len, hidden_dim)
-        
+
         position = torch.arange(0, input_len, dtype=torch.float).unsqueeze(1)
-        denominator = torch.exp((torch.log(10000.0) / hidden_dim) * torch.arange(0, hidden_dim, 2, dtype=torch.float))
+        denominator = torch.exp(
+            (torch.log(10000.0) / hidden_dim)
+            * torch.arange(0, hidden_dim, 2, dtype=torch.float)
+        )
 
         positional_encoding[:, 0::2] = torch.sin(position / denominator)
         positional_encoding[:, 1::2] = torch.cos(position / denominator)
 
-        positional_encoding = positional_encoding.unsqueeze(0) # Add batch_size dimension
+        positional_encoding = positional_encoding.unsqueeze(
+            0
+        )  # Add batch_size dimension
+        self.register_buffer("positional_encoding", positional_encoding)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
             x: Tensor, [batch_size, hidden_dim, input_len]
+        Returns:
+            out: Tensor, batch_size, hidden_dim, input_len]
         """
-        x = x + self.positional_encoding[:, :, :x.shape[2]]
+        x = x + self.positional_encoding[:, :, : x.shape[2]]
         return x
 
 
 class SepFormerBlock(nn.Module):
-    """ 
-    Main block in SepFormer model. Computes attention inside 
-    each chopped block and between blocks as well. 
+    """
+    Main block in SepFormer model. Computes attention inside
+    each chopped block and between blocks as well.
+
+    Args:
+        n_freq: size of hidden state
+        block_size: size of blocks in input tensor
+        n_attention_heads: number of attention heads in MHSA
+        n_intra_blocks: number of Intra blocks that models the short-term dependencies
+        n_inter_blocks: number of Inter blocks that models the long-term dependencies
+        dropout: dropout probability
     """
 
-    def __init__(self, n_freq, chop_block_len, n_attention_heads, n_intra_blocks, n_inter_blocks, dropout):
+    def __init__(
+        self,
+        n_freq: int,
+        block_size: int,
+        n_attention_heads: int,
+        n_intra_blocks: int,
+        n_inter_blocks: int,
+        dropout: float,
+    ) -> None:
         super().__init__()
 
-        self.n_intra_blocks = n_intra_blocks
-        self.n_inter_blocks = n_inter_blocks
+        self.intra_pos_encoding = SinusoidalPositionalEncoding(
+            hidden_dim=n_freq, input_len=block_size
+        )
+        self.intra_transformer = nn.Sequential(
+            *[
+                TransformerBlock(
+                    embed_dim=n_freq,
+                    n_attention_heads=n_attention_heads,
+                    dropout=dropout,
+                )
+                for _ in range(n_intra_blocks)
+            ]
+        )
 
-        self.intra_positional_encoding = SinusoidalPositionalEncoding(hidden_dim=n_freq, input_len=chop_block_len)
+        self.inter_pos_encoding = SinusoidalPositionalEncoding(
+            hidden_dim=block_size, input_len=n_freq
+        )
+        self.inter_transformer = nn.Sequential(
+            *[
+                TransformerBlock(
+                    embed_dim=block_size,
+                    n_attention_heads=n_attention_heads,
+                    dropout=dropout,
+                )
+                for _ in range(n_inter_blocks)
+            ]
+        )
 
-
-        self.intra_transformer = nn.ModuleList([])
-        for i in range(self.n_intra_blocks):
-            self.intra_transformer.append(TransformerBlock(embed_dim=chop_block_len,
-                                                                  n_attention_heads=n_attention_heads,
-                                                                  dropout=dropout))
-
-        
-        self.inter_positional_encoding = SinusoidalPositionalEncoding(hidden_dim=chop_block_len, input_len=n_freq)
-        self.inter_transformer = nn.ModuleList([])
-        for i in range(self.n_inter_blocks):
-            self.inter_transformer.append(TransformerBlock(embed_dim=n_freq,
-                                                                  nhead=n_attention_heads,
-                                                                  dropout=dropout))
-
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: Tensor, [batch_size, F - n_freq, C - chop block len, N_C - chop blocks]
+            x: Tensor, [batch_size, n_freq, block_size, n_blocks]
+        Returns:
+            out: Tensor, [batch_size, n_freq, block_size, n_blocks]
         """
-        pass
-    
+        B, NF, BS, NB = x.shape
+
+        # block size as time dim
+        x = x.permute(0, 3, 2, 1).contiguous().view(NB * B, BS, NF)
+        x = x + self.intra_transformer(self.intra_pos_encoding(x))
+
+        # block amount as time dim
+        x = x.permute(0, 2, 3, 1).contiguous().view(BS * B, NB, NF)
+        x = x + self.inter_transformer(self.inter_pos_encoding(x))
+
+        x = x.view(B, BS, NB, NF).permute(0, 3, 1, 2).contiguous()
+        return x
+
+
+class ChunkingMode(Enum):
+    CHUNKING = 1
+    UNCHUNKING = 2
+
+
+class Chunking(nn.Module):
+    """
+    Chunking step of SepFormer model
+
+    Args:
+        block_size: size of blocks that sequence will be divided
+    """
+
+    def __init__(self, block_size: int) -> None:
+        assert block_size % 2 == 0, "Only even block_size are supported"
+
+        self.block_size = block_size
+        self.block_stride = block_size // 2
+
+    def forward(
+        self, x: torch.Tensor, chunking_mode: ChunkingMode, n_padded: int | None = None
+    ) -> tuple[torch.Tensor, int | None]:
+        """
+        Args:
+            x: Tensor, [..., seq_len]
+            chunking_mode: ChunkingMode, to make blocks or reverse to single sequence
+            n_padded: only needed in ChunkingMode.UNCHUNKING
+        Returns:
+            out_1: Tensor, [..., block_size, n_blocks] if ChunkingMode.CHUNKING, else [..., seq_len]
+            out_2: number of padding tokens added or None if ChunkingMode.UNCHUNKING
+        """
+        match chunking_mode:
+            case ChunkingMode.CHUNKING:
+                x_padded, n_padded = self.pad(x)
+                out = torch.cat(
+                    (
+                        x_padded[..., self.block_stride :].view(
+                            *x.shape[:-1], -1, self.block_size
+                        ),
+                        x_padded[..., : -self.block_stride].view(
+                            *x.shape[:-1], -1, self.block_size
+                        ),
+                    ),
+                    dim=-2,
+                )
+                return out, n_padded
+            case ChunkingMode.UNCHUNKING:
+                assert (
+                    n_padded is not None
+                ), "n_padded should be not None when ChunkingMode.UNCHUNKING"
+                n_blocks = x.shape[-1]
+
+                left_part = (
+                    x[..., : n_blocks // 2]
+                    .transpose(-1, -2)
+                    .view(*x.shape[:-2], -1)[..., : -(self.block_stride + n_padded)]
+                )
+                right_part = (
+                    x[..., n_blocks // 2 :]
+                    .transpose(-1, -2)
+                    .view(*x.shape[:-2], -1)[..., self.block_stride : -n_padded]
+                )
+                original = (left_part + right_part) / 2
+                return original, None
+
+    def pad(self, x: torch.Tensor) -> tuple[torch.Tensor, int]:
+        """
+        Args:
+            x: Tensor, [..., seq_len]
+        Returns:
+            out_1: Tensor, [..., padded_seq_len]
+            out_2: number of padding tokens added
+        """
+        seq_len = x.shape[-1]
+        to_add = (
+            self.block_size
+            - (self.block_stride + seq_len % self.block_size) % self.block_size
+        )
+        if to_add > 0:
+            return (
+                F.pad(x, (self.block_stride, to_add + self.block_stride), value=0.0),
+                to_add,
+            )
+        return x, to_add
+
+
+class SepFormerInner(nn.Module):
+    """
+    SepFormer inner blocks that works with encoded input
+
+    Args:
+        n_speakers: number of speaker in audio, also number of masks to predict
+        n_freq: size of hidden state
+        block_size: size of blocks that sequence will be divided
+        n_sepformer_blocks: number of sequential SepFormerBlocks
+        n_intra_blocks: number of Intra blocks inside SepFormerBlocks
+        n_itner_blocks: number of Inter blocks inside SepFormerBlocks
+        n_attention_heads: number of attention heads in MHSA
+        dropout: dropout probability
+    """
+
+    def __init__(
+        self,
+        n_speakers: int,
+        n_freq: int,
+        block_size: int,
+        n_sepformer_blocks: int,
+        n_intra_blocks: int,
+        n_inter_blocks: int,
+        n_attention_heads: int,
+        dropout: float,
+    ) -> None:
+        super().__init__()
+        self.n_speakers = (n_speakers,)
+        self.n_freq = n_freq
+
+        self.ln_linear = nn.Sequential(nn.LayerNorm(n_freq), nn.Linear(n_freq, n_freq))
+        self.chunking = Chunking(block_size)
+        self.sepformer_blocks = nn.Sequential(
+            *[
+                SepFormerBlock(
+                    n_freq=n_freq,
+                    block_size=block_size,
+                    n_attention_heads=n_attention_heads,
+                    n_intra_blocks=n_intra_blocks,
+                    n_inter_blocks=n_inter_blocks,
+                    dropout=dropout,
+                )
+                for _ in range(n_sepformer_blocks)
+            ]
+        )
+
+        self.post_sepformer_blocks = nn.Sequential(
+            nn.PReLU(), nn.Linear(n_freq, n_speakers * n_freq)
+        )
+        self.final_ffw = nn.Sequential(
+            FeedForward(n_freq, 4 * n_freq, dropout=dropout),
+            FeedForward(n_freq, 4 * n_freq, dropout=dropout),
+            nn.ReLU(),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x: Tensor, [batch_size, n_freq, seq_len]
+        Returns:
+            out: Tensor, [batch_size, n_speakers, n_freq, seq_len]
+        """
+        # to [batch_size, seq_len, n_freq]
+        x = x.permute(0, 2, 1)
+        # back to original size
+        x = self.ln_linear(x).permute(0, 2, 1)
+
+        # [batch_size, n_freq, block_size, n_blocks]
+        x, padded_size = self.chunking(x, chunking_mode=ChunkingMode.CHUNKING)
+
+        x = self.sepformer_blocks(x)
+        # [batch_size, n_freq * n_speakers, block_size, n_blocks]
+        x = self.post_sepformer_blocks(x)
+
+        # [batch_size, n_freq * n_speakers, seq_len]
+        x, _ = self.chunking(
+            x, chunking_mode=ChunkingMode.UNCHUNKING, n_padded=padded_size
+        )
+
+        # [batch_size, n_speakers, n_freq, seq_len]
+        x = x.view(-1, self.n_speakers, self.n_freq, x.shape[-1])
+
+        return self.final_ffw(x)
+
+
 class SepFormer(nn.Module):
     """
-    SepFormer model from paper 
+    SepFormer model from paper
     "Attention is all you need in speech separation"
+
+    Args:
+        n_speakers: number of speaker in audio, also number of masks to predict
+        n_freq: size of hidden state
+        kernel_size: kernel_size in encoder and decoder layers
+        block_size: size of blocks that sequence will be divided
+        n_sepformer_blocks: number of sequential SepFormerBlocks
+        n_intra_blocks: number of Intra blocks inside SepFormerBlocks
+        n_itner_blocks: number of Inter blocks inside SepFormerBlocks
+        n_attention_heads: number of attention heads in MHSA
+        dropout: dropout probability
     """
 
-    def __init__(self, n_feats, n_class, fc_hidden=512):
-        """
-        Args:
-            n_feats (int): number of input features.
-            n_class (int): number of classes.
-            fc_hidden (int): number of hidden features.
-        """
-        super().__init__()
-
-        
+    def __init__(
+        self,
+        n_speakers: int,
+        n_freq: int,
+        kernel_size: int,
+        block_size: int,
+        n_sepformer_blocks: int,
+        n_intra_blocks: int,
+        n_inter_blocks: int,
+        n_attention_heads: int,
+        dropout: float,
+    ) -> None:
+        assert kernel_size % 2, "Only even kernel_size are supported"
+        self.encoder = Encoder(n_freq, kernel_size, kernel_size // 2)
+        self.decoder = Decoder(n_freq, kernel_size, kernel_size // 2)
+        self.sepformer_inner = SepFormerInner(
+            n_speakers=n_speakers,
+            n_freq=n_freq,
+            block_size=block_size,
+            n_sepformer_blocks=n_sepformer_blocks,
+            n_intra_blocks=n_intra_blocks,
+            n_inter_blocks=n_inter_blocks,
+            n_attention_heads=n_attention_heads,
+            dropout=dropout,
+        )
 
     def forward(self, x, **batch):
         """
-        Model forward method.
-
         Args:
-            x (Tensor): input vector.
+            x: input vector.
         Returns:
             output (dict): output dict containing logits.
         """
-        # Encoder
-        x_encoded = Encoder(x) 
-
-
-        # Decoder is called 2 times for each source
-        #output = Decoder(x)
-
+        x_encoded = self.encoder(x)
+        masks = self.sepformer_inner(x_encoded)
+        output = self.decoder(masks)
+        return {"separeted": output}
 
     def __str__(self):
         """

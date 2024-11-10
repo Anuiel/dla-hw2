@@ -1,5 +1,3 @@
-import math
-
 import torch
 
 from src.datasets.base_dataset import DatasetItem
@@ -43,17 +41,29 @@ def collate_fn(dataset_items: list[DatasetItem]) -> DatasetItem:
 
     result_batch = {}
     for speaker in ["sp1", "sp2", "mix"]:
-        # For inference with no ground truth
-        spectrogram_key = f"{speaker}_spectrogram"
-        spectrogram_length = torch.tensor(
-            [item[spectrogram_key].shape[-1] for item in dataset_items]
-        )
-        result_batch[f"{speaker}_spectrogram_lenght"] = spectrogram_length
+        # # For inference with no ground truth
+        # spectrogram_key = f"{speaker}_spectrogram"
+        # spectrogram_length = torch.tensor(
+        #     [item[spectrogram_key].shape[-1] for item in dataset_items]
+        # )
+        # result_batch[f"{speaker}_spectrogram_lenght"] = spectrogram_length
 
-        spectrogram = pad_sequence(
-            [item[spectrogram_key].squeeze(0) for item in dataset_items],
-            padding_item=math.log(1e-6),
+        # spectrogram = pad_sequence(
+        #     [item[spectrogram_key].squeeze(0) for item in dataset_items],
+        #     padding_item=math.log(1e-6),
+        # )
+        # result_batch[spectrogram_key] = spectrogram
+        # For inference with no ground truth
+        audio_key = f"{speaker}_audio"
+        audio_length = torch.tensor(
+            [item[audio_key].shape[-1] for item in dataset_items]
         )
-        result_batch[spectrogram_key] = spectrogram
+        result_batch[f"{speaker}_audio_lenght"] = audio_length
+
+        audio = pad_sequence(
+            [item[audio_key].squeeze(0) for item in dataset_items],
+            padding_item=0.0,
+        )
+        result_batch[audio_key] = audio
 
     return result_batch

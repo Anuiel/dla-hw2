@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Literal, Any
+from typing import Any, Literal
 
 import torchaudio
 from tqdm.auto import tqdm
@@ -22,7 +22,7 @@ class AVSSDataset(BaseDataset):
         data_dir: str | None = None,
         load_video: bool = False,
         *args,
-        **kwargs
+        **kwargs,
     ) -> None:
         """
         Args:
@@ -30,11 +30,13 @@ class AVSSDataset(BaseDataset):
             load_video (bool): load video part or not
         """
         self.load_video = load_video
-        self.data_dir = ROOT_PATH / "data" / "dla_dataset" if data_dir is None else data_dir
+        self.data_dir = (
+            ROOT_PATH / "data" / "dla_dataset" if data_dir is None else data_dir
+        )
 
         index = self._get_or_load_index(part, load_video)
         super().__init__(index, *args, **kwargs)
-    
+
     @staticmethod
     def load_files(path: Path) -> tuple[Path, int]:
         info = torchaudio.info(path)
@@ -69,29 +71,36 @@ class AVSSDataset(BaseDataset):
                 the dataset. The dict has required metadata information,
                 such as label and object path.
         """
-        if load_video == True:
+        if load_video is True:
             raise NotImplementedError("Video is not yet supported!")
         index = []
         audio_data_path = ROOT_PATH / "data" / "dla_dataset" / "audio" / part
-        assert audio_data_path.exists() and audio_data_path.is_dir(), f"No {audio_data_path} found!"
+        assert (
+            audio_data_path.exists() and audio_data_path.is_dir()
+        ), f"No {audio_data_path} found!"
 
         print(f"Loading {part} AVSS dataset")
-        
+
         for mix_path in tqdm((audio_data_path / "mix").iterdir()):
             item_id = mix_path.name
             speaker_1_path = audio_data_path / "s1" / item_id
             mix_path, mix_lenght = self.load_files(mix_path)
-            speaker_1_path, speaker_1_lenght = self.load_files(audio_data_path / "s1" / item_id)
-            speaker_2_path, speaker_2_lenght = self.load_files(audio_data_path / "s2" / item_id)
-            assert (
-                mix_lenght == speaker_1_lenght and mix_lenght == speaker_2_lenght,
-                "Audio files should have same lenght"
+            speaker_1_path, speaker_1_lenght = self.load_files(
+                audio_data_path / "s1" / item_id
             )
-            index.append({
-                "mix_path": str(mix_path),
-                "speaker_1_path": str(speaker_1_path),
-                "speaker_2_path": str(speaker_2_path),
-                "audio_lenght": mix_lenght
-            })
+            speaker_2_path, speaker_2_lenght = self.load_files(
+                audio_data_path / "s2" / item_id
+            )
+            assert (
+                mix_lenght == speaker_1_lenght and mix_lenght == speaker_2_lenght
+            ), "Audio files should have same lenght"
+            index.append(
+                {
+                    "mix_path": str(mix_path),
+                    "speaker_1_path": str(speaker_1_path),
+                    "speaker_2_path": str(speaker_2_path),
+                    "audio_lenght": mix_lenght,
+                }
+            )
 
         return index
