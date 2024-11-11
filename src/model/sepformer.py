@@ -1,3 +1,4 @@
+import math
 from enum import Enum
 
 import torch
@@ -18,10 +19,12 @@ class Encoder(nn.Module):
 
     def __init__(self, n_freq: int, kernel_size: int, stride: int):
         super().__init__()
+        assert kernel_size % 4 == 0, "Only divided by 4 kernel_size are supported"
         self.Conv1d = nn.Conv1d(
             in_channels=1,
             out_channels=n_freq,
             kernel_size=kernel_size,
+            padding=kernel_size // 4,
             stride=stride,
             bias=False,
         )
@@ -34,8 +37,7 @@ class Encoder(nn.Module):
         Returns:
             out: Tensor, [batch_size, n_freq, T']
         """
-
-        x = self.Conv1d(x)
+        x = self.Conv1d(x.unsqueeze(1))
         return self.ReLU(x)
 
 
@@ -52,10 +54,12 @@ class Decoder(nn.Module):
 
     def __init__(self, n_freq: int, kernel_size: int, stride: int):
         super().__init__()
+        assert kernel_size % 4 == 0, "Only divided by 4 kernel_size are supported"
         self.Conv1dTranspose = nn.ConvTranspose1d(
             in_channels=n_freq,
             out_channels=1,
             kernel_size=kernel_size,
+            padding=kernel_size // 4,
             stride=stride,
             bias=False,
         )
@@ -63,11 +67,13 @@ class Decoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            x: Tensor, [batch_size, n_freq, T']
+            x: Tensor, [batch_size, n_speakers, n_freq, T']
         Returns:
-            out: Tensor, [batch_size, T]
+            out: Tensor, [batch_size, n_speakers, T]
         """
-        return self.Conv1dTranspose(x)
+        BS, NS, NF, T = x.shape
+        out = self.Conv1dTranspose(x.view(BS * NS, NF, T)).squeeze(1)
+        return out.view(BS, NS, -1)
 
 
 class FeedForward(nn.Module):
@@ -81,6 +87,8 @@ class FeedForward(nn.Module):
     """
 
     def __init__(self, input_dim: int, hidden_dim: int, dropout: float) -> None:
+        super().__init__()
+
         self.ffw = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
@@ -110,6 +118,8 @@ class TransformerBlock(nn.Module):
     """
 
     def __init__(self, embed_dim: int, n_attention_heads: int, dropout: float) -> None:
+        super().__init__()
+
         self.pre_mhsa_ln = nn.LayerNorm(embed_dim)
         self.mhsa = nn.MultiheadAttention(
             embed_dim, n_attention_heads, dropout=dropout, batch_first=True
@@ -127,7 +137,7 @@ class TransformerBlock(nn.Module):
             out: Tensor, [batch_size, time_dim, embed_dim]
         """
         y = self.pre_mhsa_ln(x)
-        x = x + self.mhsa(y, y, y, attn_mask=None, key_padding_mask=None)
+        x = x + self.mhsa(y, y, y, attn_mask=None, key_padding_mask=None)[0]
         x = x + self.ffw(self.pos_mhsa_ln(x))
         return x
 
@@ -140,23 +150,23 @@ class SinusoidalPositionalEncoding(nn.Module):
 
     Args:
         hidden_dim: second dimension of tensor
-        input_len: third dimension of tensor
+        max_len: max lenght of tensor
     """
 
-    def __init__(self, hidden_dim: int, input_len: int):
+    def __init__(self, hidden_dim: int, max_len: int):
         super().__init__()
 
-        positional_encoding = torch.zeros(input_len, hidden_dim)
+        positional_encoding = torch.zeros(max_len, hidden_dim)
 
-        position = torch.arange(0, input_len, dtype=torch.float).unsqueeze(1)
+        position = torch.arange(0, max_len, dtype=torch.float).unsqueeze(1)
         denominator = torch.exp(
-            (torch.log(10000.0) / hidden_dim)
+            (math.log(10000.0) / hidden_dim)
             * torch.arange(0, hidden_dim, 2, dtype=torch.float)
         )
 
         positional_encoding[:, 0::2] = torch.sin(position / denominator)
         positional_encoding[:, 1::2] = torch.cos(position / denominator)
-
+        
         positional_encoding = positional_encoding.unsqueeze(
             0
         )  # Add batch_size dimension
@@ -167,9 +177,9 @@ class SinusoidalPositionalEncoding(nn.Module):
         Args:
             x: Tensor, [batch_size, hidden_dim, input_len]
         Returns:
-            out: Tensor, batch_size, hidden_dim, input_len]
+            out: Tensor, [batch_size, hidden_dim, input_len]
         """
-        x = x + self.positional_encoding[:, :, : x.shape[2]]
+        x = x + self.positional_encoding[:, :x.shape[1], :]
         return x
 
 
@@ -199,7 +209,7 @@ class SepFormerBlock(nn.Module):
         super().__init__()
 
         self.intra_pos_encoding = SinusoidalPositionalEncoding(
-            hidden_dim=n_freq, input_len=block_size
+            hidden_dim=n_freq, max_len=5000
         )
         self.intra_transformer = nn.Sequential(
             *[
@@ -213,12 +223,12 @@ class SepFormerBlock(nn.Module):
         )
 
         self.inter_pos_encoding = SinusoidalPositionalEncoding(
-            hidden_dim=block_size, input_len=n_freq
+            hidden_dim=n_freq, max_len=5000
         )
         self.inter_transformer = nn.Sequential(
             *[
                 TransformerBlock(
-                    embed_dim=block_size,
+                    embed_dim=n_freq,
                     n_attention_heads=n_attention_heads,
                     dropout=dropout,
                 )
@@ -237,7 +247,9 @@ class SepFormerBlock(nn.Module):
 
         # block size as time dim
         x = x.permute(0, 3, 2, 1).contiguous().view(NB * B, BS, NF)
+        x_pos = self.intra_pos_encoding(x)
         x = x + self.intra_transformer(self.intra_pos_encoding(x))
+        x = x.view(B, NB, BS, NF).contiguous().permute(0, 3, 2, 1)  # back to original shape
 
         # block amount as time dim
         x = x.permute(0, 2, 3, 1).contiguous().view(BS * B, NB, NF)
@@ -261,6 +273,8 @@ class Chunking(nn.Module):
     """
 
     def __init__(self, block_size: int) -> None:
+        super().__init__()
+
         assert block_size % 2 == 0, "Only even block_size are supported"
 
         self.block_size = block_size
@@ -291,7 +305,7 @@ class Chunking(nn.Module):
                         ),
                     ),
                     dim=-2,
-                )
+                ).transpose(-1, -2)
                 return out, n_padded
             case ChunkingMode.UNCHUNKING:
                 assert (
@@ -360,7 +374,7 @@ class SepFormerInner(nn.Module):
         dropout: float,
     ) -> None:
         super().__init__()
-        self.n_speakers = (n_speakers,)
+        self.n_speakers = n_speakers
         self.n_freq = n_freq
 
         self.ln_linear = nn.Sequential(nn.LayerNorm(n_freq), nn.Linear(n_freq, n_freq))
@@ -405,7 +419,7 @@ class SepFormerInner(nn.Module):
 
         x = self.sepformer_blocks(x)
         # [batch_size, n_freq * n_speakers, block_size, n_blocks]
-        x = self.post_sepformer_blocks(x)
+        x = self.post_sepformer_blocks(x.permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
 
         # [batch_size, n_freq * n_speakers, seq_len]
         x, _ = self.chunking(
@@ -415,7 +429,7 @@ class SepFormerInner(nn.Module):
         # [batch_size, n_speakers, n_freq, seq_len]
         x = x.view(-1, self.n_speakers, self.n_freq, x.shape[-1])
 
-        return self.final_ffw(x)
+        return self.final_ffw(x.permute(0, 1, 3, 2)).permute(0, 1, 3, 2)
 
 
 class SepFormer(nn.Module):
@@ -447,7 +461,9 @@ class SepFormer(nn.Module):
         n_attention_heads: int,
         dropout: float,
     ) -> None:
-        assert kernel_size % 2, "Only even kernel_size are supported"
+        super().__init__()
+
+        assert kernel_size % 2 == 0, "Only even kernel_size are supported"
         self.encoder = Encoder(n_freq, kernel_size, kernel_size // 2)
         self.decoder = Decoder(n_freq, kernel_size, kernel_size // 2)
         self.sepformer_inner = SepFormerInner(
@@ -461,17 +477,17 @@ class SepFormer(nn.Module):
             dropout=dropout,
         )
 
-    def forward(self, x, **batch):
+    def forward(self, mix_audio: torch.Tensor, **batch):
         """
         Args:
-            x: input vector.
+            mix_audio: mixture of audio.
         Returns:
             output (dict): output dict containing logits.
         """
-        x_encoded = self.encoder(x)
+        x_encoded = self.encoder(mix_audio)
         masks = self.sepformer_inner(x_encoded)
         output = self.decoder(masks)
-        return {"separeted": output}
+        return {"preds": output}
 
     def __str__(self):
         """

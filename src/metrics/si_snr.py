@@ -5,13 +5,13 @@ from src.metrics.base_metric import BaseMetric
 
 
 class SISignalNoiseRatio(BaseMetric):
-    def __init__(self, compute_on_cpu: bool = True, *args, **kwargs):
+    def __init__(self, device: str, *args, **kwargs):
         """
         Args:
             compute_on_cpu: compute si-snr of cpu or gpu
         """
         super().__init__(*args, **kwargs)
-        self.si_snr = ScaleInvariantSignalNoiseRatio(compute_on_cpu=compute_on_cpu)
+        self.si_snr = ScaleInvariantSignalNoiseRatio().to(device=device)
 
     def __call__(self, preds: torch.Tensor, targets: torch.Tensor, **kwargs):
         """
@@ -21,7 +21,5 @@ class SISignalNoiseRatio(BaseMetric):
         Returns:
             metric (float): calculated metric.
         """
-        result = []
-        for pred, target in zip(preds, targets):
-            result.append(self.si_snr(pred, target).detach().item())
-        return sum(result) / len(result)
+        # Does averaging on torchmetrics' side 
+        return self.si_snr(preds, targets).detach().item()

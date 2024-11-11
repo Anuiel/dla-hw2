@@ -2,18 +2,21 @@ train:
   get_spectrogram: # special key for getting spectrogram
     _target_: torchaudio.transforms.MelSpectrogram
     sample_rate: 16000
-  mix_audio:
-    _target_: torchvision.transforms.v2.Compose
-    transforms:
-      - _target_: src.transforms.audio.wav_augs.Gain
-  sp1_audio:
-    _target_: torchvision.transforms.v2.Compose
-    transforms:
-      - _target_: src.transforms.audio.wav_augs.Gain
-  sp2_audio:
-    _target_: torchvision.transforms.v2.Compose
-    transforms:
-      - _target_: src.transforms.audio.wav_augs.Gain
+  # mix_audio:
+  #   _target_: torchvision.transforms.v2.Compose
+  #   transforms:
+  #     - _target_: src.transforms.audio.wav_augs.Gain
+  #       output_type: tesnor
+  # sp1_audio:
+  #   _target_: torchvision.transforms.v2.Compose
+  #   transforms:
+  #     - _target_: src.transforms.audio.wav_augs.Gain
+  #       output_type: tesnor
+  # sp2_audio:
+  #   _target_: torchvision.transforms.v2.Compose
+  #   transforms:
+  #     - _target_: src.transforms.audio.wav_augs.Gain
+  #       output_type: tesnor
 inference:
   get_spectrogram:
     _target_: torchaudio.transforms.MelSpectrogram
