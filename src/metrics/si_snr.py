@@ -21,5 +21,5 @@ class SISignalNoiseRatio(BaseMetric):
         Returns:
             metric (float): calculated metric.
         """
-        # Does averaging on torchmetrics' side 
+        # Does averaging on torchmetrics' side
         return self.si_snr(preds, targets).detach().item()

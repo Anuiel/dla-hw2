@@ -166,7 +166,7 @@ class SinusoidalPositionalEncoding(nn.Module):
 
         positional_encoding[:, 0::2] = torch.sin(position / denominator)
         positional_encoding[:, 1::2] = torch.cos(position / denominator)
-        
+
         positional_encoding = positional_encoding.unsqueeze(
             0
         )  # Add batch_size dimension
@@ -179,7 +179,7 @@ class SinusoidalPositionalEncoding(nn.Module):
         Returns:
             out: Tensor, [batch_size, hidden_dim, input_len]
         """
-        x = x + self.positional_encoding[:, :x.shape[1], :]
+        x = x + self.positional_encoding[:, : x.shape[1], :]
         return x
 
 
@@ -247,9 +247,10 @@ class SepFormerBlock(nn.Module):
 
         # block size as time dim
         x = x.permute(0, 3, 2, 1).contiguous().view(NB * B, BS, NF)
-        x_pos = self.intra_pos_encoding(x)
         x = x + self.intra_transformer(self.intra_pos_encoding(x))
-        x = x.view(B, NB, BS, NF).contiguous().permute(0, 3, 2, 1)  # back to original shape
+        x = (
+            x.view(B, NB, BS, NF).contiguous().permute(0, 3, 2, 1)
+        )  # back to original shape
 
         # block amount as time dim
         x = x.permute(0, 2, 3, 1).contiguous().view(BS * B, NB, NF)

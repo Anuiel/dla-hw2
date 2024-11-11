@@ -16,7 +16,9 @@ class PIT_SISNR(nn.Module):
         self.si_snr = ScaleInvariantSignalNoiseRatio()
         self.n_speakers = n_speakers
 
-    def forward(self, preds: torch.Tensor, targets: torch.Tensor, **batch) -> dict | float:
+    def forward(
+        self, preds: torch.Tensor, targets: torch.Tensor, **batch
+    ) -> dict | float:
         """
         Loss function calculation logic.
 
@@ -27,13 +29,18 @@ class PIT_SISNR(nn.Module):
             out: loss value
         """
         # This is loss, so lower -> better
-        loss = -sum(
-            max([
-                self.si_snr(pred[p, :], target)
-                for p in itertools.permutations(range(self.n_speakers))
-            ])
-            for pred, target in zip(preds, targets)
-        ) / preds.shape[0]
+        loss = (
+            -sum(
+                max(
+                    [
+                        self.si_snr(pred[p, :], target)
+                        for p in itertools.permutations(range(self.n_speakers))
+                    ]
+                )
+                for pred, target in zip(preds, targets)
+            )
+            / preds.shape[0]
+        )
         if self.return_dict:
             return {"loss": loss}
         return loss
