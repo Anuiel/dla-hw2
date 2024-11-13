@@ -500,7 +500,8 @@ class SepFormer(nn.Module):
         """
         x_encoded = self.encoder(mix_audio)
         masks = self.sepformer_inner(x_encoded)
-        output = self.decoder(masks)
+        predicted = x_encoded.unsqueeze(1) * masks
+        output = self.decoder(predicted)
         return {"preds": output}
 
     def __str__(self):
