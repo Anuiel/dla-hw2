@@ -12,7 +12,7 @@ dataloader:
   batch_size: 8
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 15e-5
+  lr: 3e-4
   weight_decay: 1e-4
 lr_scheduler:
   _target_: torch.optim.lr_scheduler.StepLR
@@ -22,6 +22,7 @@ loss_function:
   _target_: src.loss.PIT_SISNR
   n_speakers: 2
 trainer:
+  mixed_precision: False
   log_step: 30
   n_epochs: 100
   epoch_len: 30

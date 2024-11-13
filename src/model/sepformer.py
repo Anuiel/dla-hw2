@@ -113,11 +113,14 @@ class TransformerBlock(nn.Module):
 
     Args:
         embed_dim: size of hidden state
+        hidden_dim: size of hidden state in FeedForward
         n_attention_heads: number of attetion heads in MHSA
         dropout: dropout probability
     """
 
-    def __init__(self, embed_dim: int, n_attention_heads: int, dropout: float) -> None:
+    def __init__(
+        self, embed_dim: int, hidden_dim: int, n_attention_heads: int, dropout: float
+    ) -> None:
         super().__init__()
 
         self.pre_mhsa_ln = nn.LayerNorm(embed_dim)
@@ -125,7 +128,7 @@ class TransformerBlock(nn.Module):
             embed_dim, n_attention_heads, dropout=dropout, batch_first=True
         )
         self.pos_mhsa_ln = nn.LayerNorm(embed_dim)
-        self.ffw = FeedForward(embed_dim, embed_dim * 4, dropout=dropout)
+        self.ffw = FeedForward(embed_dim, hidden_dim, dropout=dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
@@ -190,6 +193,7 @@ class SepFormerBlock(nn.Module):
 
     Args:
         n_freq: size of hidden state
+        n_hidden_ffw: size if hidden state in FeedForward layer reverse bottleneck
         block_size: size of blocks in input tensor
         n_attention_heads: number of attention heads in MHSA
         n_intra_blocks: number of Intra blocks that models the short-term dependencies
@@ -200,6 +204,7 @@ class SepFormerBlock(nn.Module):
     def __init__(
         self,
         n_freq: int,
+        n_hidden_ffw: int,
         block_size: int,
         n_attention_heads: int,
         n_intra_blocks: int,
@@ -215,6 +220,7 @@ class SepFormerBlock(nn.Module):
             *[
                 TransformerBlock(
                     embed_dim=n_freq,
+                    hidden_dim=n_hidden_ffw,
                     n_attention_heads=n_attention_heads,
                     dropout=dropout,
                 )
@@ -229,6 +235,7 @@ class SepFormerBlock(nn.Module):
             *[
                 TransformerBlock(
                     embed_dim=n_freq,
+                    hidden_dim=n_hidden_ffw,
                     n_attention_heads=n_attention_heads,
                     dropout=dropout,
                 )
@@ -355,6 +362,7 @@ class SepFormerInner(nn.Module):
     Args:
         n_speakers: number of speaker in audio, also number of masks to predict
         n_freq: size of hidden state
+        n_hidden_ffw: size if hidden state in FeedForward layer reverse bottleneck
         block_size: size of blocks that sequence will be divided
         n_sepformer_blocks: number of sequential SepFormerBlocks
         n_intra_blocks: number of Intra blocks inside SepFormerBlocks
@@ -367,6 +375,7 @@ class SepFormerInner(nn.Module):
         self,
         n_speakers: int,
         n_freq: int,
+        n_hidden_ffw: int,
         block_size: int,
         n_sepformer_blocks: int,
         n_intra_blocks: int,
@@ -384,6 +393,7 @@ class SepFormerInner(nn.Module):
             *[
                 SepFormerBlock(
                     n_freq=n_freq,
+                    n_hidden_ffw=n_hidden_ffw,
                     block_size=block_size,
                     n_attention_heads=n_attention_heads,
                     n_intra_blocks=n_intra_blocks,
@@ -398,8 +408,8 @@ class SepFormerInner(nn.Module):
             nn.PReLU(), nn.Linear(n_freq, n_speakers * n_freq)
         )
         self.final_ffw = nn.Sequential(
-            FeedForward(n_freq, 4 * n_freq, dropout=dropout),
-            FeedForward(n_freq, 4 * n_freq, dropout=dropout),
+            FeedForward(n_freq, n_hidden_ffw, dropout=dropout),
+            FeedForward(n_freq, n_hidden_ffw, dropout=dropout),
             nn.ReLU(),
         )
 
@@ -441,6 +451,7 @@ class SepFormer(nn.Module):
     Args:
         n_speakers: number of speaker in audio, also number of masks to predict
         n_freq: size of hidden state
+        n_hidden_ffw: size if hidden state in FeedForward layer reverse bottleneck
         kernel_size: kernel_size in encoder and decoder layers
         block_size: size of blocks that sequence will be divided
         n_sepformer_blocks: number of sequential SepFormerBlocks
@@ -454,6 +465,7 @@ class SepFormer(nn.Module):
         self,
         n_speakers: int,
         n_freq: int,
+        n_hidden_ffw: int,
         kernel_size: int,
         block_size: int,
         n_sepformer_blocks: int,
@@ -470,6 +482,7 @@ class SepFormer(nn.Module):
         self.sepformer_inner = SepFormerInner(
             n_speakers=n_speakers,
             n_freq=n_freq,
+            n_hidden_ffw=n_hidden_ffw,
             block_size=block_size,
             n_sepformer_blocks=n_sepformer_blocks,
             n_intra_blocks=n_intra_blocks,

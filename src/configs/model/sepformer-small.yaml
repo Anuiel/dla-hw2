@@ -1,6 +1,7 @@
 _target_: src.model.SepFormer
 n_speakers: 2
-n_freq: 128
+n_freq: 96
+n_hidden_ffw: 192
 kernel_size: 16
 block_size: 256
 n_sepformer_blocks: 2
