@@ -21,6 +21,7 @@ class AVSSDataset(BaseDataset):
         self,
         part: Literal["train", "val", "test", None] = None,
         data_dir: str | None = None,
+        index_dir: str | None = None, 
         load_video: bool = False,
         video_config: LipReadingConfig | None = None,
         *args,
@@ -33,6 +34,9 @@ class AVSSDataset(BaseDataset):
         """
         self.data_dir = (
             ROOT_PATH / "data" / "dla_dataset" if data_dir is None else Path(data_dir)
+        )
+        self.index_dir = (
+            self.data_dir if index_dir is None else index_dir
         )
 
         if load_video:
@@ -57,7 +61,8 @@ class AVSSDataset(BaseDataset):
         self, part: str | None, load_video: bool
     ) -> list[dict[str, Any]]:
         suffix = f"{part}_av_index.json" if load_video else f"{part}_index.json"
-        index_path = self.data_dir / suffix
+        index_path = self.index_dir / suffix
+
         if index_path.exists():
             with index_path.open() as f:
                 index = json.load(f)
@@ -88,7 +93,7 @@ class AVSSDataset(BaseDataset):
             else self.data_dir / "audio"
         )
         video_data_path = self.data_dir / "mouths_embeddings"
-
+        
         assert (
             audio_data_path.exists() and audio_data_path.is_dir()
         ), f"No {audio_data_path} found!"

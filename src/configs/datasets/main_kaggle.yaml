@@ -1,0 +1,24 @@
+train:
+  _target_: src.datasets.AVSSDataset
+  part: "train"
+  data_dir: 
+    _target_: pathlib.Path
+    _args_:
+      - "/kaggle/input/dla-speech-separation-data/dla_dataset/dla_dataset"
+  index_dir: 
+    _target_: pathlib.Path
+    _args_:
+      - "/kaggle/working/"
+  instance_transforms: ${transforms.instance_transforms.inference}
+val:
+  _target_: src.datasets.AVSSDataset
+  part: "val" 
+  data_dir: 
+    _target_: pathlib.Path
+    _args_:
+      - "/kaggle/input/dla-speech-separation-data/dla_dataset/dla_dataset"
+  index_dir: 
+    _target_: pathlib.Path
+    _args_:
+      - "/kaggle/working/"
+  instance_transforms: ${transforms.instance_transforms.inference}
