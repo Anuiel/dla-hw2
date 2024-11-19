@@ -54,7 +54,8 @@ def collate_fn(dataset_items: list[DatasetItem]) -> DatasetItem:
         target_video = torch.cat([item["target_video"].unsqueeze(0) for item in dataset_items], dim=0)
         result_batch["target_video"] = target_video
         if "target_audio" in dataset_items[0]:
-            target_audio = torch.cat([item["target_audio"].unsqueeze(0) for item in dataset_items], dim=0)
+            # target_audio in item already has shape [1, audio_lenght]
+            target_audio = torch.cat([item["target_audio"] for item in dataset_items], dim=0)
             result_batch["target_audio"] = target_audio
     else:
         # Audio logic

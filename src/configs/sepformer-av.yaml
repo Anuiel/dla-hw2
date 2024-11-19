@@ -2,13 +2,11 @@ defaults:
   - model: av-sepformer-small
   - writer: cometml
   - metrics: main
-  - datasets: onebatchtest_av
+  - datasets: main_av
   - dataloader: main
   - transforms: example_only_instance
   - video_config: lrw_resnet18_mstcn_video
   - _self_
-writer:
-  mode: "offline"
 dataloader:
   batch_size: 8
 optimizer:
@@ -22,10 +20,10 @@ lr_scheduler:
 loss_function:
   _target_: src.loss.SISNR
 trainer:
-  mixed_precision: False
-  log_step: 30
-  n_epochs: 100
-  epoch_len: 30
+  mixed_precision: True
+  log_step: 250
+  n_epochs: 50
+  epoch_len: 1000
   device_tensors: [
     "mix_audio", "audio_lenght", "target_video", "target_audio",
   ] # which tensors should be on device (ex. GPU)
@@ -37,4 +35,4 @@ trainer:
   early_stop: ${trainer.n_epochs} # epochs for early stopping
   save_dir: "saved"
   seed: 1
-  max_grad_norm: 200
+  max_grad_norm: 50

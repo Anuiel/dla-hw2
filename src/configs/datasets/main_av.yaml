@@ -1,0 +1,16 @@
+train:
+  _target_: src.datasets.AVSSDataset
+  part: "train"
+  instance_transforms: ${transforms.instance_transforms.train}
+  load_video: True
+  video_config: ${video_config}
+val:
+  _target_: src.datasets.AVSSDataset
+  part: "val"
+  instance_transforms: ${transforms.instance_transforms.inference}
+  load_video: True
+  video_config: ${video_config}
+# test:
+#   _target_: src.datasets.AVSSDataset
+#   part: "test"
+#   instance_transforms: ${transforms.instance_transforms.inference}
