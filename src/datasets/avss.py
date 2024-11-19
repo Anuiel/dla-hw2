@@ -6,8 +6,8 @@ import torchaudio
 from tqdm.auto import tqdm
 
 from src.datasets.base_dataset import BaseDataset
-from src.utils.io_utils import ROOT_PATH
 from src.datasets.lip_dataset import LipReadingConfig, create_lipreading_index
+from src.utils.io_utils import ROOT_PATH
 
 
 class AVSSDataset(BaseDataset):
@@ -36,7 +36,9 @@ class AVSSDataset(BaseDataset):
         )
 
         if load_video:
-            assert video_config is not None, "Should provide config when load_video is True"
+            assert (
+                video_config is not None
+            ), "Should provide config when load_video is True"
             if create_lipreading_index(video_config):
                 print(f"Succesfully created video index for {part}!")
             else:
@@ -96,11 +98,8 @@ class AVSSDataset(BaseDataset):
 
             item_id = mix_path.name
             mix_path, mix_lenght = self.load_files(mix_path)
-            dataset_item.update({
-                "mix_path": str(mix_path),
-                "audio_lenght": mix_lenght
-            })
-            
+            dataset_item.update({"mix_path": str(mix_path), "audio_lenght": mix_lenght})
+
             if part != "test":
                 speaker_1_path, speaker_1_lenght = self.load_files(
                     audio_data_path / "s1" / item_id
@@ -112,29 +111,37 @@ class AVSSDataset(BaseDataset):
                     mix_lenght == speaker_1_lenght and mix_lenght == speaker_2_lenght
                 ), "Audio files should have same lenght"
 
-                dataset_item.update({
-                    "sp1_audio_path": str(speaker_1_path),
-                    "sp2_audio_path": str(speaker_2_path),
-                })
+                dataset_item.update(
+                    {
+                        "sp1_audio_path": str(speaker_1_path),
+                        "sp2_audio_path": str(speaker_2_path),
+                    }
+                )
 
             if load_video:
-                sp1_id, sp2_id = str(mix_path.name).rstrip(".wav").split('_')
-                dataset_item.update({
-                    "sp1_video_path": str(video_data_path / sp1_id) + ".npz",
-                    "sp2_video_path": str(video_data_path / sp2_id) + ".npz",
-                })
+                sp1_id, sp2_id = str(mix_path.name).rstrip(".wav").split("_")
+                dataset_item.update(
+                    {
+                        "sp1_video_path": str(video_data_path / sp1_id) + ".npz",
+                        "sp2_video_path": str(video_data_path / sp2_id) + ".npz",
+                    }
+                )
 
             if load_video:
                 for speaker_id in [1, 2]:
                     video_dataset_item = {
                         "mix_path": dataset_item["mix_path"],
                         "audio_lenght": mix_lenght,
-                        "target_video_path": dataset_item[f"sp{speaker_id}_video_path"]
+                        "target_video_path": dataset_item[f"sp{speaker_id}_video_path"],
                     }
                     if part != "test":
-                        video_dataset_item.update({
-                            "target_audio_path": dataset_item[f"sp{speaker_id}_audio_path"]
-                        })
+                        video_dataset_item.update(
+                            {
+                                "target_audio_path": dataset_item[
+                                    f"sp{speaker_id}_audio_path"
+                                ]
+                            }
+                        )
                     index.append(video_dataset_item)
             else:
                 index.append(dataset_item)

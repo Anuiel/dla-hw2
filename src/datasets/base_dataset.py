@@ -81,9 +81,7 @@ class BaseDataset(Dataset):
                 (a single dataset element).
         """
         data_dict = self._index[ind]
-        instance_data = {
-            "mix_audio": self.load_audio(Path(data_dict["mix_path"]))
-        }
+        instance_data = {"mix_audio": self.load_audio(Path(data_dict["mix_path"]))}
         if not self.is_load_video:
             sp1_audio, sp2_audio = (
                 self.load_audio(Path(path) if path is not None else None)
@@ -95,25 +93,27 @@ class BaseDataset(Dataset):
 
             if sp1_audio is not None:
                 # There is ground truth found
-                instance_data.update({
-                    "sp1_audio": sp1_audio,
-                    "sp2_audio": sp2_audio,
-                })
+                instance_data.update(
+                    {
+                        "sp1_audio": sp1_audio,
+                        "sp2_audio": sp2_audio,
+                    }
+                )
         else:
             if "target_audio_path" in data_dict:
                 target_audio = self.load_audio(Path(data_dict["target_audio_path"]))
-                instance_data.update({
-                    "target_audio": target_audio
-                })
+                instance_data.update({"target_audio": target_audio})
 
-            instance_data.update({
-                "target_video": self.load_video(data_dict["target_video_path"]),
-            })
+            instance_data.update(
+                {
+                    "target_video": self.load_video(data_dict["target_video_path"]),
+                }
+            )
 
         instance_data = self.preprocess_data(instance_data)
 
         return instance_data
-    
+
     def load_video(self, path: Path) -> torch.Tensor:
         video = np.load(path)["embedding"]
         return torch.tensor(video)

@@ -29,4 +29,3 @@ done
 for file in lipreading/models/*.py; do
     rename "$file"
 done
-

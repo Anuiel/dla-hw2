@@ -5,10 +5,15 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from src.model.sepformer import Encoder as AudioEncoder
+from src.model.sepformer import Chunking, ChunkingMode
 from src.model.sepformer import Decoder as AudioDecoder
-from src.model.sepformer import FeedForward, TransformerBlock, SinusoidalPositionalEncoding
-from src.model.sepformer import ChunkingMode, Chunking
+from src.model.sepformer import Encoder as AudioEncoder
+from src.model.sepformer import (
+    FeedForward,
+    SinusoidalPositionalEncoding,
+    TransformerBlock,
+)
+
 
 class VideoEncoder(nn.Module):
     """
@@ -24,7 +29,14 @@ class VideoEncoder(nn.Module):
 
         self.encoder = nn.Sequential(
             nn.BatchNorm1d(input_dim),
-            nn.Conv1d(input_dim, input_dim, kernel_size=3, padding=1, groups=input_dim, bias=False),
+            nn.Conv1d(
+                input_dim,
+                input_dim,
+                kernel_size=3,
+                padding=1,
+                groups=input_dim,
+                bias=False,
+            ),
             nn.PReLU(),
             nn.BatchNorm1d(input_dim),
         )
@@ -52,9 +64,7 @@ class CrossModalAttention(nn.Module):
         dropout: dropout probability
     """
 
-    def __init__(
-        self, embed_dim: int, n_attention_heads: int, dropout: float
-    ) -> None:
+    def __init__(self, embed_dim: int, n_attention_heads: int, dropout: float) -> None:
         super().__init__()
         assert embed_dim % n_attention_heads == 0
         self.wq = nn.Linear(embed_dim, embed_dim, bias=False)
@@ -77,10 +87,12 @@ class CrossModalAttention(nn.Module):
         B, R, T, C = audio.shape
         q, k, v = self.wq(video), self.wk(audio), self.wv(audio)
         k = k.view(B, R, T, self.n_head, C // self.n_head).transpose(2, 3)
-        v = v.view(B, R, T, self.n_head, C // self.n_head).transpose(2, 3) 
+        v = v.view(B, R, T, self.n_head, C // self.n_head).transpose(2, 3)
         q = q.view(B, 1, T, self.n_head, C // self.n_head).transpose(2, 3)
 
-        out = torch.nn.functional.scaled_dot_product_attention(q, k, v, dropout_p=self.dropout if self.training else 0.0)
+        out = torch.nn.functional.scaled_dot_product_attention(
+            q, k, v, dropout_p=self.dropout if self.training else 0.0
+        )
         out = out.transpose(2, 3).contiguous().view(B, R, T, C)
         out = self.wo(out)
         return out

@@ -51,11 +51,15 @@ def collate_fn(dataset_items: list[DatasetItem]) -> DatasetItem:
 
     # Video logic
     if "target_video" in dataset_items[0]:
-        target_video = torch.cat([item["target_video"].unsqueeze(0) for item in dataset_items], dim=0)
+        target_video = torch.cat(
+            [item["target_video"].unsqueeze(0) for item in dataset_items], dim=0
+        )
         result_batch["target_video"] = target_video
         if "target_audio" in dataset_items[0]:
             # target_audio in item already has shape [1, audio_lenght]
-            target_audio = torch.cat([item["target_audio"] for item in dataset_items], dim=0)
+            target_audio = torch.cat(
+                [item["target_audio"] for item in dataset_items], dim=0
+            )
             result_batch["target_audio"] = target_audio
     else:
         # Audio logic
@@ -70,6 +74,8 @@ def collate_fn(dataset_items: list[DatasetItem]) -> DatasetItem:
             )
 
             # [batch_size, n_speakers, seq_len]
-            target_audio = torch.cat((sp1_audio.unsqueeze(1), sp2_audio.unsqueeze(1)), dim=1)
+            target_audio = torch.cat(
+                (sp1_audio.unsqueeze(1), sp2_audio.unsqueeze(1)), dim=1
+            )
             result_batch["targets"] = target_audio
     return result_batch
