@@ -26,6 +26,7 @@ class BaseDataset(Dataset):
     def __init__(
         self,
         index: list[DatasetItem],
+        load_video: bool,
         target_sr: int = 16000,
         max_audio_length: int | None = None,
         limit: int | None = None,
@@ -37,6 +38,7 @@ class BaseDataset(Dataset):
             index (list[dict]): list, containing dict for each element of
                 the dataset. The dict has required metadata information,
                 such as label and object path.
+            load_video (bool): load video of lips
             target_sr (int): supported sample rate.
             limit (int | None): if not None, limit the total number of elements
                 in the dataset to 'limit' elements.
@@ -58,6 +60,7 @@ class BaseDataset(Dataset):
             index = self._sort_index(index)
 
         self._index = index
+        self.is_load_video = load_video
 
         self.target_sr = target_sr
         self.instance_transforms = instance_transforms
@@ -78,56 +81,52 @@ class BaseDataset(Dataset):
                 (a single dataset element).
         """
         data_dict = self._index[ind]
-        mix_audio, sp1_audio, sp2_audio = (
-            self.load_audio(Path(path))
-            for path in (
-                data_dict["mix_path"],
-                data_dict["speaker_1_path"],
-                data_dict["speaker_2_path"],
-            )
-        )
-
-        # mix_spectrogram, sp1_spectrogram, sp2_spectrogram = (
-        #     self.get_spectrogram(audio)
-        #     for audio in (
-        #         mix_audio,
-        #         sp1_audio,
-        #         sp2_audio
-        #     )
-        # )
-
         instance_data = {
-            "mix_audio": mix_audio,
-            # "mix_spectrogram": mix_spectrogram,
-            "sp1_audio": sp1_audio,
-            # "sp1_spectrogram": sp1_spectrogram,
-            "sp2_audio": sp2_audio,
-            # "sp2_spectrogram": sp2_spectrogram
+            "mix_audio": self.load_audio(Path(data_dict["mix_path"]))
         }
+        if not self.is_load_video:
+            sp1_audio, sp2_audio = (
+                self.load_audio(Path(path) if path is not None else None)
+                for path in (
+                    data_dict.get("sp1_audio_path", None),
+                    data_dict.get("sp2_audio_path", None),
+                )
+            )
+
+            if sp1_audio is not None:
+                # There is ground truth found
+                instance_data.update({
+                    "sp1_audio": sp1_audio,
+                    "sp2_audio": sp2_audio,
+                })
+        else:
+            if "target_audio_path" in data_dict:
+                target_audio = self.load_audio(Path(data_dict["target_audio_path"]))
+                instance_data.update({
+                    "target_audio": target_audio
+                })
+
+            instance_data.update({
+                "target_video": self.load_video(data_dict["target_video_path"]),
+            })
 
         instance_data = self.preprocess_data(instance_data)
 
         return instance_data
+    
+    def load_video(self, path: Path) -> torch.Tensor:
+        video = np.load(path)["embedding"]
+        return torch.tensor(video)
 
-    def load_audio(self, path: Path) -> torch.Tensor:
+    def load_audio(self, path: Path | None) -> torch.Tensor | None:
+        if path is None:
+            return None
         audio_tensor, sr = torchaudio.load(path)
         audio_tensor = audio_tensor[0:1, :]  # remove all channels but the first
         target_sr = self.target_sr
         if sr != target_sr:
             audio_tensor = torchaudio.functional.resample(audio_tensor, sr, target_sr)
         return audio_tensor
-
-    def get_spectrogram(self, audio: torch.Tensor) -> torch.Tensor:
-        """
-        Special instance transform with a special key to
-        get spectrogram from audio.
-
-        Args:
-            audio (Tensor): original audio.
-        Returns:
-            spectrogram (Tensor): spectrogram for the audio.
-        """
-        return self.instance_transforms["get_spectrogram"](audio)
 
     def __len__(self) -> int:
         """
@@ -163,8 +162,6 @@ class BaseDataset(Dataset):
         """
         if self.instance_transforms is not None:
             for transform_name in self.instance_transforms.keys():
-                if transform_name == "get_spectrogram":
-                    continue  # skip special key
                 instance_data[transform_name] = self.instance_transforms[
                     transform_name
                 ](instance_data[transform_name])
@@ -229,14 +226,6 @@ class BaseDataset(Dataset):
             assert "mix_path" in entry, (
                 "Each dataset item should include field 'mix_path'"
                 " - path to mix of audio."
-            )
-            assert "speaker_1_path" in entry, (
-                "Each dataset item should include field 'speaker_1_path'"
-                " - path to first speaker speech of audio."
-            )
-            assert "speaker_2_path" in entry, (
-                "Each dataset item should include field 'speaker_2_path'"
-                " - path to first speaker speech of audio."
             )
 
     @staticmethod

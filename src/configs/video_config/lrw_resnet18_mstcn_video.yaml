@@ -1,0 +1,6 @@
+_target_: src.datasets.lip_dataset.LipReadingConfig
+data_path: "data/dla_dataset/mouths"
+embeddings_path: "data/dla_dataset/mouths_embeddings"
+model_config_path: "src/datasets/lip_dataset/lipreading/configs/lrw_resnet18_mstcn.json"
+model_path: "data/weights/lrw_resnet18_mstcn_video.pth"
+device: "cuda"

@@ -49,16 +49,26 @@ def collate_fn(dataset_items: list[DatasetItem]) -> DatasetItem:
     )
     result_batch["mix_audio"] = mix_audio
 
-    sp1_audio = pad_sequence(
-        [item["sp1_audio"].squeeze(0) for item in dataset_items],
-        padding_item=0.0,
-    )
-    sp2_audio = pad_sequence(
-        [item["sp2_audio"].squeeze(0) for item in dataset_items],
-        padding_item=0.0,
-    )
+    # Video logic
+    if "target_video" in dataset_items[0]:
+        target_video = torch.cat([item["target_video"].unsqueeze(0) for item in dataset_items], dim=0)
+        result_batch["target_video"] = target_video
+        if "target_audio" in dataset_items[0]:
+            target_audio = torch.cat([item["target_audio"].unsqueeze(0) for item in dataset_items], dim=0)
+            result_batch["target_audio"] = target_audio
+    else:
+        # Audio logic
+        if "sp1_audio" in dataset_items[0]:
+            sp1_audio = pad_sequence(
+                [item["sp1_audio"].squeeze(0) for item in dataset_items],
+                padding_item=0.0,
+            )
+            sp2_audio = pad_sequence(
+                [item["sp2_audio"].squeeze(0) for item in dataset_items],
+                padding_item=0.0,
+            )
 
-    # [batch_size, n_speakers, seq_len]
-    target_audio = torch.cat((sp1_audio.unsqueeze(1), sp2_audio.unsqueeze(1)), dim=1)
-    result_batch["targets"] = target_audio
+            # [batch_size, n_speakers, seq_len]
+            target_audio = torch.cat((sp1_audio.unsqueeze(1), sp2_audio.unsqueeze(1)), dim=1)
+            result_batch["targets"] = target_audio
     return result_batch
