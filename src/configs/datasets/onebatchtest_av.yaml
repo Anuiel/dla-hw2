@@ -3,8 +3,12 @@ train:
   part: "train"
   limit: 8
   instance_transforms: ${transforms.instance_transforms.train}
+  load_video: True
+  video_config: ${video_config}
 val:
   _target_: src.datasets.AVSSDataset
   part: "train"
   limit: 8
   instance_transforms: ${transforms.instance_transforms.inference}
+  load_video: True
+  video_config: ${video_config}

@@ -3,7 +3,7 @@ import warnings
 import hydra
 import torch
 from hydra.utils import instantiate
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from src.datasets.data_utils import get_dataloaders
 from src.trainer import Trainer

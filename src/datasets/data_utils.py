@@ -1,10 +1,10 @@
-from typing import Iterator, Any
 from itertools import repeat
+from typing import Any, Iterator
 
 import torch
-from torch.utils.data import DataLoader
-from omegaconf import DictConfig
 from hydra.utils import instantiate
+from omegaconf import DictConfig
+from torch.utils.data import DataLoader
 
 from src.datasets.base_dataset import DatasetItem
 from src.datasets.collate import collate_fn
@@ -24,8 +24,7 @@ def inf_loop(dataloader: DataLoader[DatasetItem]) -> Iterator[DatasetItem]:
 
 
 def move_batch_transforms_to_device(
-    batch_transforms: dict[str, dict[str, Any]],
-    device: torch.device
+    batch_transforms: dict[str, dict[str, Any]], device: torch.device
 ):
     """
     Move batch_transforms to device.
@@ -52,8 +51,7 @@ def move_batch_transforms_to_device(
 
 
 def get_dataloaders(
-    config: DictConfig,
-    device: torch.device
+    config: DictConfig, device: torch.device
 ) -> tuple[DataLoader[DatasetItem], dict[str, dict[str, Any]]]:
     """
     Create dataloaders for each of the dataset partitions.
@@ -80,7 +78,6 @@ def get_dataloaders(
     dataloaders = {}
     for dataset_partition in config.datasets.keys():
         dataset = datasets[dataset_partition]
-
         assert config.dataloader.batch_size <= len(dataset), (
             f"The batch size ({config.dataloader.batch_size}) cannot "
             f"be larger than the dataset length ({len(dataset)})"

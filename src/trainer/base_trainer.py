@@ -72,6 +72,7 @@ class BaseTrainer:
         self.lr_scheduler = lr_scheduler
         self.batch_transforms = batch_transforms
 
+        self.mixed_precision = self.cfg_trainer.mixed_precision or False
         # define dataloaders
         self.train_dataloader = dataloaders["train"]
         if epoch_len is None:
@@ -202,17 +203,15 @@ class BaseTrainer:
         self.train_metrics.reset()
         self.writer.set_step((epoch - 1) * self.epoch_len)
         self.writer.add_scalar("epoch", epoch)
-        for x in self.train_dataloader:
-            print(x)
-            break
         for batch_idx, batch in enumerate(
             tqdm(self.train_dataloader, desc="train", total=self.epoch_len)
         ):
             try:
-                batch = self.process_batch(
-                    batch,
-                    metrics=self.train_metrics,
-                )
+                with torch.cuda.amp.autocast(self.mixed_precision):
+                    batch = self.process_batch(
+                        batch,
+                        metrics=self.train_metrics,
+                    )
             except torch.cuda.OutOfMemoryError as e:
                 if self.skip_oom:
                     self.logger.warning("OOM on batch. Skipping batch.")

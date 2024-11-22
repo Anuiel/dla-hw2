@@ -1,11 +1,7 @@
-train:
-  _target_: src.datasets.AVSSDataset
-  part: "train"
-  instance_transforms: ${transforms.instance_transforms.train}
 val:
   _target_: src.datasets.AVSSDataset
-  part: "val"
   instance_transforms: ${transforms.instance_transforms.inference}
+  data_dir: "data/custom"
 # test:
 #   _target_: src.datasets.AVSSDataset
 #   part: "test"

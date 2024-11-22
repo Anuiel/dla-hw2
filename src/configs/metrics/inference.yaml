@@ -1,0 +1,15 @@
+device: "auto"
+inference:
+  - _target_: src.metrics.SDR
+    name: "SDR"
+    device: "cuda"
+  - _target_: src.metrics.SISNRi
+    name: "SI-SNRi"
+    device: "cuda"
+  - _target_: src.metrics.PESQ
+    name: "PESQ"
+    mode: 'wb'
+    device: "cpu" # only works there
+  - _target_: src.metrics.STOI
+    name: "STOI"
+    device: "cpu" # only works there

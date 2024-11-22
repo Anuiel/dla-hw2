@@ -1,5 +1,4 @@
-from src.model.baseline_model import BaselineModel
+from src.model.sepformer import SepFormer
+from src.model.sepformer_av import AVSepFormer
 
-__all__ = [
-    "BaselineModel",
-]
+__all__ = ["SepFormer", "AVSepFormer"]

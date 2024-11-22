@@ -1,0 +1,11 @@
+_target_: src.model.AVSepFormer
+n_freq: 96
+n_hidden_ffw: 192
+n_video_embed: 512
+kernel_size: 16
+block_size: 170 # So n_blocks = 50 = video_lenght
+n_sepformer_blocks: 2
+n_intra_blocks: 3
+n_inter_blocks: 3
+n_attention_heads: 8
+dropout: 0.0

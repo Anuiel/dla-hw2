@@ -1,0 +1,4 @@
+defaults:
+  - metrics: inference
+predictions_dir: data/saved/val-custom/
+ground_truth_dir: data/custom/

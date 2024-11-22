@@ -1,0 +1,16 @@
+device: "auto"
+train: []
+inference: []
+# TODO: add fancy metric
+  # - _target_: src.loss.ExampleMetric
+  #   metric:
+  #     _target_: torchmetrics.classification.MulticlassAccuracy
+  #     num_classes: 10
+  #   device: ${metrics.device}
+  #   name: "MulticlassAccuracy"
+  # - _target_: src.metrics.ExampleMetric
+  #   metric:
+  #     _target_: torchmetrics.classification.MulticlassAccuracy
+  #     num_classes: 10
+  #   device: ${metrics.device}
+  #   name: "MulticlassAccuracy2.0"

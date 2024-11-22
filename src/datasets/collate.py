@@ -1,5 +1,3 @@
-import math
-
 import torch
 
 from src.datasets.base_dataset import DatasetItem
@@ -42,18 +40,45 @@ def collate_fn(dataset_items: list[DatasetItem]) -> DatasetItem:
     """
 
     result_batch = {}
-    for speaker in ["sp1", "sp2", "mix"]:
-        # For inference with no ground truth
-        spectrogram_key = f"{speaker}_spectrogram"
-        spectrogram_length = torch.tensor(
-            [item[spectrogram_key].shape[-1] for item in dataset_items]
-        )
-        result_batch[f"{speaker}_spectrogram_lenght"] = spectrogram_length
+    audio_length = torch.tensor([item["mix_audio"].shape[-1] for item in dataset_items])
+    result_batch["audio_lenght"] = audio_length
 
-        spectrogram = pad_sequence(
-            [item[spectrogram_key].squeeze(0) for item in dataset_items],
-            padding_item=math.log(1e-6),
-        )
-        result_batch[spectrogram_key] = spectrogram
+    mix_audio = pad_sequence(
+        [item["mix_audio"].squeeze(0) for item in dataset_items],
+        padding_item=0.0,
+    )
 
+    ids = [item["id"] for item in dataset_items]
+    result_batch["mix_audio"] = mix_audio
+    result_batch["id"] = ids
+
+    # Video logic
+    if "target_video" in dataset_items[0]:
+        target_video = torch.cat(
+            [item["target_video"].unsqueeze(0) for item in dataset_items], dim=0
+        )
+        result_batch["target_video"] = target_video
+        if "target_audio" in dataset_items[0]:
+            # target_audio in item already has shape [1, audio_lenght]
+            target_audio = torch.cat(
+                [item["target_audio"] for item in dataset_items], dim=0
+            )
+            result_batch["target_audio"] = target_audio
+    else:
+        # Audio logic
+        if "sp1_audio" in dataset_items[0]:
+            sp1_audio = pad_sequence(
+                [item["sp1_audio"].squeeze(0) for item in dataset_items],
+                padding_item=0.0,
+            )
+            sp2_audio = pad_sequence(
+                [item["sp2_audio"].squeeze(0) for item in dataset_items],
+                padding_item=0.0,
+            )
+
+            # [batch_size, n_speakers, seq_len]
+            target_audio = torch.cat(
+                (sp1_audio.unsqueeze(1), sp2_audio.unsqueeze(1)), dim=1
+            )
+            result_batch["targets"] = target_audio
     return result_batch
