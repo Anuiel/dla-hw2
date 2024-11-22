@@ -22,7 +22,7 @@
 
 ## Launch
 
-See LAUNCH.md for information how to inference project.
+See [LAUNCH.md](https://github.com/Anuiel/dla-hw2/README.md) for information how to inference project.
 
 ## About
 
