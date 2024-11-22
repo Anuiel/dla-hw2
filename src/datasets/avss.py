@@ -24,6 +24,7 @@ class AVSSDataset(BaseDataset):
         index_dir: str | None = None, 
         load_video: bool = False,
         video_config: LipReadingConfig | None = None,
+        dynamic_mixing: bool = False, 
         *args,
         **kwargs,
     ) -> None:
@@ -31,6 +32,7 @@ class AVSSDataset(BaseDataset):
         Args:
             part (str): partition part
             load_video (bool): load video part or not
+            dynamic_mixing (bool): mix speakers online instead of preselected pairs
         """
         self.data_dir = (
             ROOT_PATH / "data" / "dla_dataset" if data_dir is None else Path(data_dir)
@@ -43,13 +45,16 @@ class AVSSDataset(BaseDataset):
             assert (
                 video_config is not None
             ), "Should provide config when load_video is True"
+            assert (
+                dynamic_mixing is False
+            ), "Currently dynamic_mixing is not supported with video mode"
             if create_lipreading_index(video_config):
                 print(f"Succesfully created video index for {part}!")
             else:
                 print("Using pre-made video index.")
 
         index = self._get_or_load_index(part, load_video)
-        super().__init__(index, load_video=load_video, *args, **kwargs)
+        super().__init__(index, load_video=load_video, dynamic_mixing=dynamic_mixing, *args, **kwargs)
 
     @staticmethod
     def load_files(path: Path) -> tuple[Path, int]:
@@ -93,7 +98,7 @@ class AVSSDataset(BaseDataset):
             else self.data_dir / "audio"
         )
         video_data_path = self.data_dir / "mouths_embeddings"
-        
+
         assert (
             audio_data_path.exists() and audio_data_path.is_dir()
         ), f"No {audio_data_path} found!"

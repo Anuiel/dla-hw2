@@ -31,6 +31,7 @@ class BaseDataset(Dataset):
         max_audio_length: int | None = None,
         limit: int | None = None,
         shuffle_index: bool = False,
+        dynamic_mixing: bool = False, 
         instance_transforms: dict[str, Callable[[Any], Any]] | None = None,
     ):
         """
@@ -62,6 +63,7 @@ class BaseDataset(Dataset):
         self._index = index
         self.is_load_video = load_video
 
+        self.dynamic_mixing = dynamic_mixing
         self.target_sr = target_sr
         self.instance_transforms = instance_transforms
 
@@ -81,37 +83,55 @@ class BaseDataset(Dataset):
                 (a single dataset element).
         """
         data_dict = self._index[ind]
-        instance_data = {
-            "mix_audio": self.load_audio(Path(data_dict["mix_path"])),
-            "id": data_dict["id"],
-        }
-        if not self.is_load_video:
+        
+        if self.dynamic_mixing:
+            ind_pair = random.randint(0, len(self._index) - 1)
             sp1_audio, sp2_audio = (
-                self.load_audio(Path(path) if path is not None else None)
+                self.load_audio(Path(path))
                 for path in (
-                    data_dict.get("sp1_audio_path", None),
-                    data_dict.get("sp2_audio_path", None),
+                    self._index[ind]["speaker_1_path"],
+                    self._index[ind_pair]["speaker_2_path"],
                 )
             )
+            mix_audio = sp1_audio + sp2_audio
 
-            if sp1_audio is not None:
-                # There is ground truth found
+            instance_data = {
+                "mix_audio": mix_audio,
+                "sp1_audio": sp1_audio,
+                "sp2_audio": sp2_audio,
+            }
+        else: 
+            instance_data = {
+                "mix_audio": self.load_audio(Path(data_dict["mix_path"])),
+                "id": data_dict["id"],
+            }
+            if not self.is_load_video:
+                sp1_audio, sp2_audio = (
+                    self.load_audio(Path(path) if path is not None else None)
+                    for path in (
+                        data_dict.get("sp1_audio_path", None),
+                        data_dict.get("sp2_audio_path", None),
+                    )
+                )
+
+                if sp1_audio is not None:
+                    # There is ground truth found
+                    instance_data.update(
+                        {
+                            "sp1_audio": sp1_audio,
+                            "sp2_audio": sp2_audio,
+                        }
+                    )
+            else:
+                if "target_audio_path" in data_dict:
+                    target_audio = self.load_audio(Path(data_dict["target_audio_path"]))
+                    instance_data.update({"target_audio": target_audio})
+
                 instance_data.update(
                     {
-                        "sp1_audio": sp1_audio,
-                        "sp2_audio": sp2_audio,
+                        "target_video": self.load_video(data_dict["target_video_path"]),
                     }
                 )
-        else:
-            if "target_audio_path" in data_dict:
-                target_audio = self.load_audio(Path(data_dict["target_audio_path"]))
-                instance_data.update({"target_audio": target_audio})
-
-            instance_data.update(
-                {
-                    "target_video": self.load_video(data_dict["target_video_path"]),
-                }
-            )
 
         instance_data = self.preprocess_data(instance_data)
 
