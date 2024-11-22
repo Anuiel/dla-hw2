@@ -19,7 +19,7 @@ class AVSSDataset(BaseDataset):
 
     def __init__(
         self,
-        part: Literal["train", "val", "test"] = "train",
+        part: Literal["train", "val", "test", None] = None,
         data_dir: str | None = None,
         load_video: bool = False,
         video_config: LipReadingConfig | None = None,
@@ -32,7 +32,7 @@ class AVSSDataset(BaseDataset):
             load_video (bool): load video part or not
         """
         self.data_dir = (
-            ROOT_PATH / "data" / "dla_dataset" if data_dir is None else data_dir
+            ROOT_PATH / "data" / "dla_dataset" if data_dir is None else Path(data_dir)
         )
 
         if load_video:
@@ -53,7 +53,9 @@ class AVSSDataset(BaseDataset):
         lenght = info.num_frames / info.sample_rate
         return path, lenght
 
-    def _get_or_load_index(self, part: str, load_video: bool) -> list[dict[str, Any]]:
+    def _get_or_load_index(
+        self, part: str | None, load_video: bool
+    ) -> list[dict[str, Any]]:
         suffix = f"{part}_av_index.json" if load_video else f"{part}_index.json"
         index_path = self.data_dir / suffix
         if index_path.exists():
@@ -80,8 +82,12 @@ class AVSSDataset(BaseDataset):
                 such as label and object path.
         """
         index = []
-        audio_data_path = ROOT_PATH / "data" / "dla_dataset" / "audio" / part
-        video_data_path = ROOT_PATH / "data" / "dla_dataset" / "mouths_embeddings"
+        audio_data_path = (
+            self.data_dir / "audio" / part
+            if part is not None
+            else self.data_dir / "audio"
+        )
+        video_data_path = self.data_dir / "mouths_embeddings"
 
         assert (
             audio_data_path.exists() and audio_data_path.is_dir()

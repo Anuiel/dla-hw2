@@ -81,7 +81,10 @@ class BaseDataset(Dataset):
                 (a single dataset element).
         """
         data_dict = self._index[ind]
-        instance_data = {"mix_audio": self.load_audio(Path(data_dict["mix_path"]))}
+        instance_data = {
+            "mix_audio": self.load_audio(Path(data_dict["mix_path"])),
+            "id": data_dict["id"],
+        }
         if not self.is_load_video:
             sp1_audio, sp2_audio = (
                 self.load_audio(Path(path) if path is not None else None)

@@ -1,7 +1,7 @@
 defaults:
   - model: sepformer-base
-  - metrics: inference
-  - datasets: val
+  - metrics: main
+  - datasets: test
   - dataloader: main
   - transforms: example_only_instance
   - _self_
@@ -9,9 +9,9 @@ dataloader:
   batch_size: 8
 inferencer:
   device_tensors: [
-    "mix_audio", "audio_lenght", "targets",
+    "mix_audio", "audio_lenght",
   ] # which tensors should be on device (ex. GPU)
   device: auto # device name or "auto"
   seed: 1
   from_pretrained: "data/weights/sepformer-best-checkpoint.pth" # path to the pretrained model
-  save_path: "val-2"
+  save_path: "test"

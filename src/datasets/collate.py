@@ -47,7 +47,10 @@ def collate_fn(dataset_items: list[DatasetItem]) -> DatasetItem:
         [item["mix_audio"].squeeze(0) for item in dataset_items],
         padding_item=0.0,
     )
+
+    ids = [item["id"] for item in dataset_items]
     result_batch["mix_audio"] = mix_audio
+    result_batch["id"] = ids
 
     # Video logic
     if "target_video" in dataset_items[0]:

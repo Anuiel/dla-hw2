@@ -41,8 +41,8 @@ def main(config):
     metrics = instantiate(config.metrics)
 
     # save_path for model predictions
-    # save_path = ROOT_PATH / "data" / "saved" / config.inferencer.save_path
-    # save_path.mkdir(exist_ok=True, parents=True)
+    save_path = ROOT_PATH / "data" / "saved" / config.inferencer.save_path
+    save_path.mkdir(exist_ok=True, parents=True)
 
     inferencer = Inferencer(
         model=model,
@@ -50,7 +50,7 @@ def main(config):
         device=device,
         dataloaders=dataloaders,
         batch_transforms=batch_transforms,
-        # save_path=save_path,
+        save_path=save_path,
         metrics=metrics,
         skip_model_load=False,
     )

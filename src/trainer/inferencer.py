@@ -1,4 +1,7 @@
+from pathlib import Path
+
 import torch
+import torchaudio
 from tqdm.auto import tqdm
 
 from src.loss import PIT_SISNR
@@ -20,6 +23,7 @@ class Inferencer(BaseTrainer):
         model,
         config,
         device,
+        save_path,
         dataloaders,
         metrics=None,
         batch_transforms=None,
@@ -60,6 +64,9 @@ class Inferencer(BaseTrainer):
         # define dataloaders
         self.evaluation_dataloaders = {k: v for k, v in dataloaders.items()}
 
+        self.save_path = save_path
+        (save_path / "s1").mkdir(exist_ok=True, parents=True)
+        (save_path / "s2").mkdir(exist_ok=True, parents=True)
         # define metrics
         self.metrics = metrics
         if self.metrics is not None:
@@ -119,26 +126,37 @@ class Inferencer(BaseTrainer):
 
         batch_size = batch["preds"].shape[0]
         predictions = batch["preds"]
-        loss, opt_p = self.si_snr(return_p=True, **batch)
-        metrics.update("PIT_SI-SNR", -loss)
+        if "targets" in batch:
+            loss, opt_p = self.si_snr(return_p=True, **batch)
+            metrics.update("PIT_SI-SNR", -loss)
+        else:
+            opt_p = [[0, 1] for _ in range(len(batch["preds"]))]
 
         ordered_predictions = []
         for i in range(batch_size):
             sp1_pred, sp2_pred = (
-                predictions[i, opt_p[i][0], :],
-                predictions[i, opt_p[i][1], :],
+                self.normalize_audio(predictions[i, opt_p[i][0], :]),
+                self.normalize_audio(predictions[i, opt_p[i][1], :]),
             )
             ordered_predictions.append(
                 torch.cat((sp1_pred.unsqueeze(0), sp2_pred.unsqueeze(0)), dim=0)
             )
-            # if (
-            #     "save_path" in batch
-            #     and (save_path := batch["save_path"][i]) is not None
-            # ):
-            #     with open(save_path, "w") as output_file:
-            #         output_file.write(predictions_text)
-            # you can use safetensors or other lib here
-            # torch.save(output, self.save_path / part / f"output_{output_id}.txt")
+            output_path_sp1: Path = self.save_path / "s1" / (batch["id"][i] + ".wav")
+            torchaudio.save(
+                output_path_sp1,
+                sp1_pred.unsqueeze(0).detach().cpu(),
+                16000,
+                format="wav",
+                buffer_size=128,
+            )
+            output_path_sp2: Path = self.save_path / "s2" / (batch["id"][i] + ".wav")
+            torchaudio.save(
+                output_path_sp2,
+                sp2_pred.unsqueeze(0).detach().cpu(),
+                16000,
+                format="wav",
+                buffer_size=128,
+            )
         ordered_predictions = torch.cat(
             [pred.unsqueeze(0) for pred in ordered_predictions]
         )
@@ -148,6 +166,15 @@ class Inferencer(BaseTrainer):
                 metrics.update(met.name, met(**batch))
 
         return batch
+
+    def normalize_audio(self, audio: torch.Tensor) -> torch.Tensor:
+        db_threshold = 30
+        amplitude_threshold = 10 ** (db_threshold / 20.0)
+        audio = audio / audio.abs().max()
+        clipped_waveform = audio.clamp(
+            min=-amplitude_threshold, max=amplitude_threshold
+        )
+        return clipped_waveform
 
     def _inference_part(self, part, dataloader):
         """

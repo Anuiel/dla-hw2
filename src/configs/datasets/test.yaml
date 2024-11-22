@@ -1,0 +1,5 @@
+test:
+  _target_: src.datasets.AVSSDataset
+  part: "test"
+  instance_transforms: ${transforms.instance_transforms.inference}
+  limit: 8
