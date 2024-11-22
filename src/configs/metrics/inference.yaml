@@ -1,0 +1,18 @@
+device: "auto"
+inference: 
+  - _target_: src.metrics.SDR
+    name: "SDR"
+    device: "cuda"
+  - _target_: src.metrics.PESQ
+    name: "PESQ"
+    mode: 'wb'
+    device: "cpu" # only works there
+  - _target_: src.metrics.STOI
+    name: "STOI"
+    device: "cpu" # only works there
+  # - _target_: src.metrics.ExampleMetric
+  #   metric:
+  #     _target_: torchmetrics.classification.MulticlassAccuracy
+  #     num_classes: 10
+  #   device: ${metrics.device}
+  #   name: "MulticlassAccuracy2.0"

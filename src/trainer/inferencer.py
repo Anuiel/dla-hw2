@@ -1,6 +1,7 @@
 import torch
 from tqdm.auto import tqdm
 
+from src.loss import PIT_SISNR
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
 
@@ -20,7 +21,6 @@ class Inferencer(BaseTrainer):
         config,
         device,
         dataloaders,
-        save_path,
         metrics=None,
         batch_transforms=None,
         skip_model_load=False,
@@ -34,8 +34,6 @@ class Inferencer(BaseTrainer):
             device (str): device for tensors and model.
             dataloaders (dict[DataLoader]): dataloaders for different
                 sets of data.
-            save_path (str): path to save model predictions and other
-                information.
             metrics (dict): dict with the definition of metrics for
                 inference (metrics[inference]). Each metric is an instance
                 of src.metrics.BaseMetric.
@@ -62,19 +60,16 @@ class Inferencer(BaseTrainer):
         # define dataloaders
         self.evaluation_dataloaders = {k: v for k, v in dataloaders.items()}
 
-        # path definition
-
-        self.save_path = save_path
-
         # define metrics
         self.metrics = metrics
         if self.metrics is not None:
             self.evaluation_metrics = MetricTracker(
-                *[m.name for m in self.metrics["inference"]],
+                *([m.name for m in self.metrics["inference"]] + ["PIT_SI-SNR"]),
                 writer=None,
             )
         else:
             self.evaluation_metrics = None
+        self.si_snr = PIT_SISNR(2).to(device)
 
         if not skip_model_load:
             # init model
@@ -99,9 +94,6 @@ class Inferencer(BaseTrainer):
         Run batch through the model, compute metrics, and
         save predictions to disk.
 
-        Save directory is defined by save_path in the inference
-        config and current partition.
-
         Args:
             batch_idx (int): the index of the current batch.
             batch (dict): dict-based batch containing the data from
@@ -122,33 +114,38 @@ class Inferencer(BaseTrainer):
         outputs = self.model(**batch)
         batch.update(outputs)
 
-        if metrics is not None:
-            for met in self.metrics["inference"]:
-                metrics.update(met.name, met(**batch))
-
         # Some saving logic. This is an example
         # Use if you need to save predictions on disk
 
-        batch_size = batch["logits"].shape[0]
-        current_id = batch_idx * batch_size
+        batch_size = batch["preds"].shape[0]
+        predictions = batch["preds"]
+        loss, opt_p = self.si_snr(return_p=True, **batch)
+        metrics.update("PIT_SI-SNR", -loss)
 
+        ordered_predictions = []
         for i in range(batch_size):
-            # clone because of
-            # https://github.com/pytorch/pytorch/issues/1995
-            logits = batch["logits"][i].clone()
-            label = batch["labels"][i].clone()
-            pred_label = logits.argmax(dim=-1)
-
-            output_id = current_id + i
-
-            output = {
-                "pred_label": pred_label,
-                "label": label,
-            }
-
-            if self.save_path is not None:
-                # you can use safetensors or other lib here
-                torch.save(output, self.save_path / part / f"output_{output_id}.pth")
+            sp1_pred, sp2_pred = (
+                predictions[i, opt_p[i][0], :],
+                predictions[i, opt_p[i][1], :],
+            )
+            ordered_predictions.append(
+                torch.cat((sp1_pred.unsqueeze(0), sp2_pred.unsqueeze(0)), dim=0)
+            )
+            # if (
+            #     "save_path" in batch
+            #     and (save_path := batch["save_path"][i]) is not None
+            # ):
+            #     with open(save_path, "w") as output_file:
+            #         output_file.write(predictions_text)
+            # you can use safetensors or other lib here
+            # torch.save(output, self.save_path / part / f"output_{output_id}.txt")
+        ordered_predictions = torch.cat(
+            [pred.unsqueeze(0) for pred in ordered_predictions]
+        )
+        batch["preds"] = ordered_predictions
+        if metrics is not None:
+            for met in self.metrics["inference"]:
+                metrics.update(met.name, met(**batch))
 
         return batch
 
@@ -167,10 +164,6 @@ class Inferencer(BaseTrainer):
         self.model.eval()
 
         self.evaluation_metrics.reset()
-
-        # create Save dir
-        if self.save_path is not None:
-            (self.save_path / part).mkdir(exist_ok=True, parents=True)
 
         with torch.no_grad():
             for batch_idx, batch in tqdm(

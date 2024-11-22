@@ -8,22 +8,22 @@ defaults:
   - video_config: lrw_resnet18_mstcn_video
   - _self_
 dataloader:
-  batch_size: 8
+  batch_size: 2
 optimizer:
   _target_: torch.optim.AdamW
-  lr: 3e-4
-  weight_decay: 1e-4
+  lr: 0.00015
+  weight_decay: 0.0000001
 lr_scheduler:
   _target_: torch.optim.lr_scheduler.StepLR
-  gamma: 0.9
+  gamma: 0.95
   step_size: ${trainer.epoch_len}
 loss_function:
   _target_: src.loss.SISNR
 trainer:
-  mixed_precision: True
-  log_step: 250
-  n_epochs: 50
-  epoch_len: 1000
+  mixed_precision: False
+  log_step: 100
+  n_epochs: 100
+  epoch_len: 5000
   device_tensors: [
     "mix_audio", "audio_lenght", "target_video", "target_audio",
   ] # which tensors should be on device (ex. GPU)

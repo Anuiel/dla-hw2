@@ -17,7 +17,11 @@ class PIT_SISNR(nn.Module):
         self.n_speakers = n_speakers
 
     def forward(
-        self, preds: torch.Tensor, targets: torch.Tensor, **batch
+        self,
+        preds: torch.Tensor,
+        targets: torch.Tensor,
+        return_p: bool = False,
+        **batch
     ) -> dict | float:
         """
         Loss function calculation logic.
@@ -41,6 +45,18 @@ class PIT_SISNR(nn.Module):
             )
             / preds.shape[0]
         )
-        if self.return_dict:
-            return {"loss": loss}
-        return loss
+        if return_p:
+            opt_p = [
+                max(
+                    [
+                        (self.si_snr(pred[p, :], target), p)
+                        for p in itertools.permutations(range(self.n_speakers))
+                    ]
+                )[1]
+                for pred, target in zip(preds, targets)
+            ]
+            return loss, opt_p
+        else:
+            if self.return_dict:
+                return {"loss": loss}
+            return loss

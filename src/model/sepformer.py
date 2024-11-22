@@ -459,6 +459,7 @@ class SepFormer(nn.Module):
         n_itner_blocks: number of Inter blocks inside SepFormerBlocks
         n_attention_heads: number of attention heads in MHSA
         dropout: dropout probability
+        residual_masks: to predicts masks or target audio
     """
 
     def __init__(
@@ -473,6 +474,7 @@ class SepFormer(nn.Module):
         n_inter_blocks: int,
         n_attention_heads: int,
         dropout: float,
+        residual_masks: bool = True,
     ) -> None:
         super().__init__()
 
@@ -490,6 +492,7 @@ class SepFormer(nn.Module):
             n_attention_heads=n_attention_heads,
             dropout=dropout,
         )
+        self.residual_masks = residual_masks
 
     def forward(self, mix_audio: torch.Tensor, **batch):
         """
@@ -500,7 +503,10 @@ class SepFormer(nn.Module):
         """
         x_encoded = self.encoder(mix_audio)
         masks = self.sepformer_inner(x_encoded)
-        predicted = x_encoded.unsqueeze(1) * masks
+        if self.residual_masks:
+            predicted = x_encoded.unsqueeze(1) * masks
+        else:
+            predicted = masks
         output = self.decoder(predicted)
         return {"preds": output}
 

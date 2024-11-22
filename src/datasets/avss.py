@@ -98,7 +98,13 @@ class AVSSDataset(BaseDataset):
 
             item_id = mix_path.name
             mix_path, mix_lenght = self.load_files(mix_path)
-            dataset_item.update({"mix_path": str(mix_path), "audio_lenght": mix_lenght})
+            dataset_item.update(
+                {
+                    "mix_path": str(mix_path),
+                    "audio_lenght": mix_lenght,
+                    "id": item_id.rstrip(".wav"),
+                }
+            )
 
             if part != "test":
                 speaker_1_path, speaker_1_lenght = self.load_files(

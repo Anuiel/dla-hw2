@@ -1,13 +1,16 @@
 defaults:
-  - model: baseline
-  - metrics: example
-  - datasets: example_eval # we do not want to run inference on training data
-  - dataloader: example
-  - transforms: example
+  - model: sepformer-base
+  - metrics: inference
+  - datasets: inference
+  - dataloader: main
+  - transforms: example_only_instance
   - _self_
+dataloader:
+  batch_size: 1
 inferencer:
-  device_tensors: ["data_object", "labels"] # which tensors should be on device (ex. GPU)
+  device_tensors: [
+    "mix_audio", "audio_lenght", "targets",
+  ] # which tensors should be on device (ex. GPU)
   device: auto # device name or "auto"
-  save_path: "example" # any name here, can be a dataset name
   seed: 1
-  from_pretrained: "saved/model_best.pth" # path to the pretrained model
+  from_pretrained: "data/weights/sepformer-best-checkpoint.pth" # path to the pretrained model
