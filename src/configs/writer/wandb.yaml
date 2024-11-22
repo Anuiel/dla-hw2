@@ -1,5 +1,5 @@
 _target_: src.logger.WandBWriter
-project_name: "pytorch_template"
+project_name: "dla_speech_separation"
 entity: null
 run_name: "testing"
 mode: "online"

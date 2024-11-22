@@ -21,8 +21,11 @@ class AVSSDataset(BaseDataset):
         self,
         part: Literal["train", "val", "test", None] = None,
         data_dir: str | None = None,
+        index_dir: str | None = None, 
         load_video: bool = False,
         video_config: LipReadingConfig | None = None,
+        dynamic_mixing: bool = False, 
+        random_seed: bool = 42, 
         *args,
         **kwargs,
     ) -> None:
@@ -30,22 +33,29 @@ class AVSSDataset(BaseDataset):
         Args:
             part (str): partition part
             load_video (bool): load video part or not
+            dynamic_mixing (bool): mix speakers online instead of preselected pairs
         """
         self.data_dir = (
             ROOT_PATH / "data" / "dla_dataset" if data_dir is None else Path(data_dir)
+        )
+        self.index_dir = (
+            self.data_dir if index_dir is None else index_dir
         )
 
         if load_video:
             assert (
                 video_config is not None
             ), "Should provide config when load_video is True"
+            assert (
+                dynamic_mixing is False
+            ), "Currently dynamic_mixing is not supported with video mode"
             if create_lipreading_index(video_config):
                 print(f"Succesfully created video index for {part}!")
             else:
                 print("Using pre-made video index.")
 
         index = self._get_or_load_index(part, load_video)
-        super().__init__(index, load_video=load_video, *args, **kwargs)
+        super().__init__(index, load_video=load_video, dynamic_mixing=dynamic_mixing, random_seed=random_seed, *args, **kwargs)
 
     @staticmethod
     def load_files(path: Path) -> tuple[Path, int]:
@@ -57,7 +67,8 @@ class AVSSDataset(BaseDataset):
         self, part: str | None, load_video: bool
     ) -> list[dict[str, Any]]:
         suffix = f"{part}_av_index.json" if load_video else f"{part}_index.json"
-        index_path = self.data_dir / suffix
+        index_path = self.index_dir / suffix
+
         if index_path.exists():
             with index_path.open() as f:
                 index = json.load(f)
