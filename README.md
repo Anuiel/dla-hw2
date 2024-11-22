@@ -20,6 +20,10 @@
 </a>
 </p>
 
+## Launch
+
+See LAUNCH.md for information how to inference project.
+
 ## About
 
 This repository contains a template for [PyTorch](https://pytorch.org/)-based Deep Learning projects.
