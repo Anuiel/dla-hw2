@@ -25,6 +25,7 @@ class AVSSDataset(BaseDataset):
         load_video: bool = False,
         video_config: LipReadingConfig | None = None,
         dynamic_mixing: bool = False, 
+        random_seed: bool = 42, 
         *args,
         **kwargs,
     ) -> None:
@@ -54,7 +55,7 @@ class AVSSDataset(BaseDataset):
                 print("Using pre-made video index.")
 
         index = self._get_or_load_index(part, load_video)
-        super().__init__(index, load_video=load_video, dynamic_mixing=dynamic_mixing, *args, **kwargs)
+        super().__init__(index, load_video=load_video, dynamic_mixing=dynamic_mixing, random_seed=random_seed, *args, **kwargs)
 
     @staticmethod
     def load_files(path: Path) -> tuple[Path, int]:

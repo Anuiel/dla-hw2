@@ -32,6 +32,7 @@ class BaseDataset(Dataset):
         limit: int | None = None,
         shuffle_index: bool = False,
         dynamic_mixing: bool = False, 
+        random_seed: int = 42, 
         instance_transforms: dict[str, Callable[[Any], Any]] | None = None,
     ):
         """
@@ -46,6 +47,8 @@ class BaseDataset(Dataset):
             max_audio_length (int): maximum allowed audio length.
             shuffle_index (bool): if True, shuffle the index. Uses python
                 random package with seed 42.
+            dynamic_mixing (bool): generate pairs online instead of premade pairs.
+            random_seed (int): for dynamic mixing random id generation.
             instance_transforms (dict[Callable] | None): transforms that
                 should be applied on the instance. Depend on the
                 tensor name.
@@ -66,6 +69,8 @@ class BaseDataset(Dataset):
         self.dynamic_mixing = dynamic_mixing
         self.target_sr = target_sr
         self.instance_transforms = instance_transforms
+        self.random_generator = random.Random(random_seed)
+
 
     def __getitem__(self, ind: int) -> DatasetItem:
         """
@@ -85,7 +90,7 @@ class BaseDataset(Dataset):
         data_dict = self._index[ind]
         
         if self.dynamic_mixing:
-            ind_pair = random.randint(0, len(self._index) - 1)
+            ind_pair = self.random_generator.randint(0, len(self._index) - 1)
             sp1_audio, sp2_audio = (
                 self.load_audio(Path(path))
                 for path in (
