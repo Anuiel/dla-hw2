@@ -6,7 +6,7 @@ defaults:
   - transforms: example_only_instance
   - _self_
 dataloader:
-  batch_size: 1
+  batch_size: 8
 inferencer:
   device_tensors: [
     "mix_audio", "audio_lenght", "targets",

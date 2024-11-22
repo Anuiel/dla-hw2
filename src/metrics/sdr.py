@@ -3,6 +3,7 @@ from torchmetrics.audio import SignalDistortionRatio
 
 from src.metrics.base_metric import BaseMetric
 
+
 class SDR(BaseMetric):
     def __init__(self, device: str, *args, **kwargs):
         """

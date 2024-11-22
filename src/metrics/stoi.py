@@ -3,6 +3,7 @@ from torchmetrics.audio.stoi import ShortTimeObjectiveIntelligibility
 
 from src.metrics.base_metric import BaseMetric
 
+
 class STOI(BaseMetric):
     def __init__(self, device: str, sampling_rate: int = 16000, *args, **kwargs):
         """
