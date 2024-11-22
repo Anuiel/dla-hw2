@@ -4,7 +4,7 @@ To use this repo you must run theese commands:
 ```bash
 pip3 install -r requirements.txt
 ```
-And download weights for out model and put them at any place
+And [download weights](https://github.com/Anuiel/dla-hw2/releases/tag/weights) for out model and put them at any place
 
 ### Inference
 
