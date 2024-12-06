@@ -16,10 +16,10 @@ class AVSSDataset(BaseDataset):
 
     Contains audio + video of 2 speakers
     """
-
     def __init__(
         self,
         part: Literal["train", "val", "test", None] = None,
+        load_target: bool = True,
         data_dir: str | None = None,
         index_dir: str | None = None, 
         load_video: bool = False,
@@ -35,6 +35,11 @@ class AVSSDataset(BaseDataset):
             load_video (bool): load video part or not
             dynamic_mixing (bool): mix speakers online instead of preselected pairs
         """
+        if part == "test":
+            assert not dynamic_mixing, "Dynamic mixing is not supported for test part"
+            assert not load_target, "Load target is not supported for test part"
+        
+        self.load_target = load_target
         self.data_dir = (
             ROOT_PATH / "data" / "dla_dataset" if data_dir is None else Path(data_dir)
         )
@@ -54,7 +59,7 @@ class AVSSDataset(BaseDataset):
             else:
                 print("Using pre-made video index.")
 
-        index = self._get_or_load_index(part, load_video)
+        index = self._get_or_load_index(part, load_video, load_target)
         super().__init__(index, load_video=load_video, dynamic_mixing=dynamic_mixing, random_seed=random_seed, *args, **kwargs)
 
     @staticmethod
@@ -64,9 +69,9 @@ class AVSSDataset(BaseDataset):
         return path, lenght
 
     def _get_or_load_index(
-        self, part: str | None, load_video: bool
+        self, part: str | None, load_video: bool, load_target: bool = True
     ) -> list[dict[str, Any]]:
-        suffix = f"{part}_av_index.json" if load_video else f"{part}_index.json"
+        suffix = f"{part}{int(load_target)}_av_index.json" if load_video else f"{part}{int(load_target)}_index.json"
         index_path = self.index_dir / suffix
 
         if index_path.exists():
@@ -123,7 +128,7 @@ class AVSSDataset(BaseDataset):
                 }
             )
 
-            if part != "test":
+            if self.load_target:
                 speaker_1_path, speaker_1_lenght = self.load_files(
                     audio_data_path / "s1" / item_id
                 )
@@ -168,5 +173,5 @@ class AVSSDataset(BaseDataset):
                     index.append(video_dataset_item)
             else:
                 index.append(dataset_item)
-
+        print(index)
         return index

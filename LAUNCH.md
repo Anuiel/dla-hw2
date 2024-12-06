@@ -16,16 +16,23 @@ python3 inference.py -cn=inference
 
 To inference on custom dataset:
 ```bash
-python3 inference.py -cn=inference datasets=custom datasets.data_dir="<PATH_TO_DATA>"
+python3 inference.py -cn=inference \
+    datasets=custom \
+    datasets.data_dir="<PATH_TO_DATA>" \
+    datasets.load_target=True
 ```
 
 If you don't have ground truth labels, then run this:
 ```bash
-python3 inference.py -cn=inference-no-labels datasets=custom datasets.data_dir="<PATH_TO_DATA>"
+python3 inference.py -cn=inference-no-labels \
+    datasets=custom \ 
+    datasets.data_dir="<PATH_TO_DATA>" \
+    datasets.load_target=False \
+    inferencer.save_path="<SAVE_PATH>"
 ```
 
-To any of scripts above you can add option `inferencer.save_path="<CUSTOM_PATH>"` to save predictions there
-
+To any of scripts above you can add option `inferencer.save_path="<CUSTOM_PATH>"` to save predictions there.
+To load model weights from file add option `inferencer.from_pretrained="<PATH_TO_MODEL_WEIGHT>"`.
 ### Metrics
 
 If you want to calculate metrics from already existing preds then run:

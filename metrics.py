@@ -26,8 +26,6 @@ def load_audio(path: Path, target_sr: int = 16000) -> torch.Tensor:
 @hydra.main(version_base=None, config_path="src/configs", config_name="metrics")
 def main(config):
     """
-    Script for easy CER/WER evaluation over existing predictions and ground truth
-
     Args:
         predictions_dir: Directory with predicted text
         ground_truth_dir: Directory with ground truth text
