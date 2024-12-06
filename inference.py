@@ -41,8 +41,11 @@ def main(config):
     metrics = instantiate(config.metrics)
 
     # save_path for model predictions
-    save_path = ROOT_PATH / "data" / "saved" / config.inferencer.save_path
-    save_path.mkdir(exist_ok=True, parents=True)
+    if config.inferencer.save_path is None:
+        save_path = None
+    else:
+        save_path = ROOT_PATH / "data" / "saved" / config.inferencer.save_path
+        save_path.mkdir(exist_ok=True, parents=True)
 
     inferencer = Inferencer(
         model=model,
