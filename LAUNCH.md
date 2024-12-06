@@ -3,6 +3,7 @@
 To use this repo you must run theese commands:
 ```bash
 pip3 install -r requirements.txt
+chmod +x lip_reading_download.sh && ./lip_reading_download.sh
 ```
 And [download weights](https://github.com/Anuiel/dla-hw2/releases/tag/weights) for out model and put them at any place
 
