@@ -65,8 +65,9 @@ class Inferencer(BaseTrainer):
         self.evaluation_dataloaders = {k: v for k, v in dataloaders.items()}
 
         self.save_path = save_path
-        (save_path / "s1").mkdir(exist_ok=True, parents=True)
-        (save_path / "s2").mkdir(exist_ok=True, parents=True)
+        if self.save_path is not None:
+            (save_path / "s1").mkdir(exist_ok=True, parents=True)
+            (save_path / "s2").mkdir(exist_ok=True, parents=True)
         # define metrics
         self.metrics = metrics
         if self.metrics is not None:
@@ -141,22 +142,23 @@ class Inferencer(BaseTrainer):
             ordered_predictions.append(
                 torch.cat((sp1_pred.unsqueeze(0), sp2_pred.unsqueeze(0)), dim=0)
             )
-            output_path_sp1: Path = self.save_path / "s1" / (batch["id"][i] + ".wav")
-            torchaudio.save(
-                output_path_sp1,
-                sp1_pred.unsqueeze(0).detach().cpu(),
-                16000,
-                format="wav",
-                buffer_size=128,
-            )
-            output_path_sp2: Path = self.save_path / "s2" / (batch["id"][i] + ".wav")
-            torchaudio.save(
-                output_path_sp2,
-                sp2_pred.unsqueeze(0).detach().cpu(),
-                16000,
-                format="wav",
-                buffer_size=128,
-            )
+            if self.save_path is not None:
+                output_path_sp1: Path = self.save_path / "s1" / (batch["id"][i] + ".wav")
+                torchaudio.save(
+                    output_path_sp1,
+                    sp1_pred.unsqueeze(0).detach().cpu(),
+                    16000,
+                    format="wav",
+                    buffer_size=128,
+                )
+                output_path_sp2: Path = self.save_path / "s2" / (batch["id"][i] + ".wav")
+                torchaudio.save(
+                    output_path_sp2,
+                    sp2_pred.unsqueeze(0).detach().cpu(),
+                    16000,
+                    format="wav",
+                    buffer_size=128,
+                )
         ordered_predictions = torch.cat(
             [pred.unsqueeze(0) for pred in ordered_predictions]
         )

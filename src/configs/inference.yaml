@@ -13,5 +13,5 @@ inferencer:
   ] # which tensors should be on device (ex. GPU)
   device: auto # device name or "auto"
   seed: 1
-  from_pretrained: "data/weights/sepformer-best-checkpoint.pth" # path to the pretrained model
-  save_path: "val-2"
+  from_pretrained: "/home/anuiel/Remote/Anuiel/sound-dz-2/dla-hw2/data/weights/dynamix_mixing_checkpoint.pth" # path to the pretrained model
+  save_path: null
